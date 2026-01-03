@@ -1,10 +1,18 @@
 import fs from "fs";
 import path from "path";
+import {
+  atomicWriteFile,
+  atomicWriteFileSync,
+  cleanupStaleTempFiles,
+} from "./atomicWrite.js";
 
 const getJsonPath = (filename) => {
   const srcDir = path.join(__dirname, "..", "..");
   return path.join(srcDir, "shared", "json", filename);
 };
+
+const jsonDir = path.join(__dirname, "..", "..", "shared", "json");
+cleanupStaleTempFiles(jsonDir);
 
 export const loadJsonFile = async (filename, defaultValue, warningMsg) => {
   const filePath = getJsonPath(filename);
@@ -13,7 +21,15 @@ export const loadJsonFile = async (filename, defaultValue, warningMsg) => {
     return JSON.parse(data);
   } catch (error) {
     if (warningMsg) console.warn(warningMsg, error);
-    return defaultValue;
+
+    try {
+      const backupPath = `${filePath}.backup`;
+      const backupData = await fs.promises.readFile(backupPath, "utf-8");
+      console.warn(`Restored ${filename} from backup`);
+      return JSON.parse(backupData);
+    } catch (backupError) {
+      return defaultValue;
+    }
   }
 };
 
@@ -24,18 +40,23 @@ export const loadJsonFileSync = (filename, defaultValue, errorMsg) => {
     return JSON.parse(data);
   } catch (error) {
     if (errorMsg) console.error(errorMsg, error);
-    return defaultValue;
+
+    try {
+      const backupPath = `${filePath}.backup`;
+      const backupData = fs.readFileSync(backupPath, "utf-8");
+      console.warn(`Restored ${filename} from backup`);
+      return JSON.parse(backupData);
+    } catch (backupError) {
+      return defaultValue;
+    }
   }
 };
 
 export const saveJsonFile = async (filename, data) => {
   const filePath = getJsonPath(filename);
   try {
-    await fs.promises.writeFile(
-      filePath,
-      JSON.stringify(data, null, 2),
-      "utf-8"
-    );
+    const dataString = JSON.stringify(data, null, 2);
+    await atomicWriteFile(filePath, dataString);
   } catch (error) {
     console.error(`Error writing ${filename}:`, error);
   }
@@ -44,9 +65,9 @@ export const saveJsonFile = async (filename, data) => {
 export const saveJsonFileSync = (filename, data) => {
   const filePath = getJsonPath(filename);
   try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    const dataString = JSON.stringify(data, null, 2);
+    atomicWriteFileSync(filePath, dataString);
   } catch (error) {
     console.error(`Error writing ${filename} (sync):`, error);
   }
 };
-

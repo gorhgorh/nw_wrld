@@ -3,6 +3,10 @@ import path from "path";
 import { produce } from "immer";
 import { migrateToSets, getActiveSet } from "../../shared/utils/setUtils.js";
 import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig.js";
+import {
+  atomicWriteFile,
+  atomicWriteFileSync,
+} from "../../shared/json/atomicWrite.js";
 
 const getMethodsByLayer = (module, moduleBase, threeBase) => {
   if (!module || !module.methods) return [];
@@ -198,10 +202,40 @@ const loadUserData = async () => {
     migratedData._loadedSuccessfully = true;
     return migratedData;
   } catch (error) {
-    console.warn(
-      "Could not load userData.json, initializing with empty data.",
-      error
-    );
+    console.warn("Could not load userData.json, trying backup...", error);
+
+    try {
+      const backupPath = `${filePath}.backup`;
+      const backupData = await fs.promises.readFile(backupPath, "utf-8");
+      const parsedData = JSON.parse(backupData);
+      const migratedData = migrateToSets(parsedData);
+
+      if (!migratedData.config) {
+        migratedData.config = {};
+      }
+      if (!Array.isArray(migratedData.sets)) {
+        migratedData.sets = [];
+      }
+
+      if (!migratedData.config.trackMappings) {
+        migratedData.config.trackMappings =
+          DEFAULT_GLOBAL_MAPPINGS.trackMappings;
+      }
+      if (!migratedData.config.channelMappings) {
+        migratedData.config.channelMappings =
+          DEFAULT_GLOBAL_MAPPINGS.channelMappings;
+      }
+
+      migratedData._loadedSuccessfully = true;
+      console.warn("Restored from backup");
+      return migratedData;
+    } catch (backupError) {
+      console.warn(
+        "Backup also failed, initializing with empty data.",
+        backupError
+      );
+    }
+
     const defaultData = {
       config: {
         activeSetId: null,
@@ -234,7 +268,7 @@ const saveUserData = async (data) => {
     delete dataToSave._isDefaultData;
     delete dataToSave._loadedSuccessfully;
     const dataString = JSON.stringify(dataToSave, null, 2);
-    await fs.promises.writeFile(filePath, dataString, "utf-8");
+    await atomicWriteFile(filePath, dataString);
   } catch (error) {
     console.error("Error writing userData to JSON file:", error);
   }
@@ -259,7 +293,7 @@ const saveUserDataSync = (data) => {
     delete dataToSave._isDefaultData;
     delete dataToSave._loadedSuccessfully;
     const dataString = JSON.stringify(dataToSave, null, 2);
-    fs.writeFileSync(filePath, dataString, "utf-8");
+    atomicWriteFileSync(filePath, dataString);
   } catch (error) {
     console.error("Error writing userData to JSON file (sync):", error);
   }

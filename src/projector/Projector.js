@@ -81,6 +81,8 @@ const Projector = {
   },
   userData: [],
   isDeactivating: false,
+  isLoadingTrack: false,
+  pendingTrackName: null,
   previewModuleName: null,
   debugOverlayActive: false,
   debugLogQueue: [],
@@ -190,15 +192,8 @@ const Projector = {
         }
 
         if (type === "set-activate") {
-          try {
-            this.loadUserData(props.setId);
-            this.deactivateActiveTrack();
-          } finally {
-            ipcRenderer.send("projector-to-dashboard", {
-              type: "projector-ready",
-              props: {},
-            });
-          }
+          this.loadUserData(props.setId);
+          this.deactivateActiveTrack();
           return;
         }
 
@@ -458,10 +453,37 @@ const Projector = {
         }`
       );
     } catch (err) {
-      console.error("Error loading userData.json:", err);
-      this.userData = [];
-      this.config = {};
-      this.inputType = "midi";
+      console.error("Error loading userData.json, trying backup...", err);
+
+      try {
+        const backupPath = `${userDataPath}.backup`;
+        const backupData = fs.readFileSync(backupPath, "utf-8");
+        const parsedData = JSON.parse(backupData);
+        const migratedData = migrateToSets(parsedData);
+
+        let activeSetId = null;
+        if (activeSetIdOverride) {
+          activeSetId = activeSetIdOverride;
+        } else {
+          try {
+            const appStateData = fs.readFileSync(appStatePath, "utf-8");
+            const appState = JSON.parse(appStateData);
+            activeSetId = appState.activeSetId;
+          } catch (appStateErr) {
+            activeSetId = null;
+          }
+        }
+
+        this.userData = getActiveSetTracks(migratedData, activeSetId);
+        this.config = migratedData.config || {};
+        this.inputType = migratedData.config?.input?.type || "midi";
+        console.warn(`Restored from backup: ${this.userData.length} tracks`);
+      } catch (backupErr) {
+        console.error("Backup also failed, using empty state:", backupErr);
+        this.userData = [];
+        this.config = {};
+        this.inputType = "midi";
+      }
     }
   },
 
@@ -520,6 +542,26 @@ const Projector = {
     logger.log("📦 [TRACK] Current userData:", this.userData);
     logger.log("📦 [TRACK] Looking for track with name:", trackName);
 
+    // If already loading, store this as pending and return
+    if (this.isLoadingTrack) {
+      // If requesting the same track that's loading, ignore
+      if (this.activeTrack?.name === trackName) {
+        logger.log(
+          "⚠️ [TRACK] Already loading this track, ignoring duplicate request"
+        );
+        return;
+      }
+      // Store the new track as pending (latest request wins)
+      logger.log(
+        `⚠️ [TRACK] Track load in progress, queueing "${trackName}" as pending`
+      );
+      this.pendingTrackName = trackName;
+      return;
+    }
+
+    // Set loading flag early to prevent concurrent loads
+    this.isLoadingTrack = true;
+
     const track = find(this.userData, { name: trackName });
     logger.log("📦 [TRACK] Track found:", track);
 
@@ -530,6 +572,7 @@ const Projector = {
         this.userData.map((t) => t.name)
       );
       this.deactivateActiveTrack();
+      this.isLoadingTrack = false;
       return;
     }
 
@@ -545,6 +588,7 @@ const Projector = {
 
     if (this.activeTrack?.name === trackName) {
       logger.log("⚠️ [TRACK] Track already active, skipping");
+      this.isLoadingTrack = false;
       return;
     }
 
@@ -553,6 +597,7 @@ const Projector = {
 
     if (!modulesContainer) {
       logger.error("❌ [TRACK] No .modules container found in DOM!");
+      this.isLoadingTrack = false;
       return;
     }
 
@@ -564,64 +609,75 @@ const Projector = {
         track.modules
       );
       logger.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      this.isLoadingTrack = false;
       return;
     }
 
-    // Ensure activeTrack is set before executing constructor methods (matrix needs module type)
-    this.activeTrack = track;
-    this.activeChannelHandlers = this.buildChannelHandlerMap(track);
+    try {
+      // Ensure activeTrack is set before executing constructor methods (matrix needs module type)
+      this.activeTrack = track;
+      this.activeChannelHandlers = this.buildChannelHandlerMap(track);
 
-    // Collect all initialization promises
-    const moduleInitPromises = track.modules.map(
-      async (moduleInstance, index) => {
-        const { id: instanceId, type: moduleType } = moduleInstance;
-        logger.log(
-          `🔧 [MODULE] Loading module ${index + 1}/${
-            track.modules.length
-          }: ${moduleType} (${instanceId})`
-        );
-        let ModuleClass;
-        try {
-          ModuleClass = await this.loadModuleClass(moduleType);
-          logger.log(`Module loaded: ${moduleType} (${instanceId})`);
-        } catch (error) {
-          logger.error(`Error loading module "${moduleType}":`, error);
-          return;
-        }
+      // Collect all initialization promises
+      const moduleInitPromises = track.modules.map(
+        async (moduleInstance, index) => {
+          const { id: instanceId, type: moduleType } = moduleInstance;
+          logger.log(
+            `🔧 [MODULE] Loading module ${index + 1}/${
+              track.modules.length
+            }: ${moduleType} (${instanceId})`
+          );
+          let ModuleClass;
+          try {
+            ModuleClass = await this.loadModuleClass(moduleType);
+            logger.log(`Module loaded: ${moduleType} (${instanceId})`);
+          } catch (error) {
+            logger.error(`Error loading module "${moduleType}":`, error);
+            return;
+          }
 
-        const constructorMethods = get(track.modulesData, [
-          instanceId,
-          "constructor",
-        ]);
+          const constructorMethods = get(track.modulesData, [
+            instanceId,
+            "constructor",
+          ]);
 
-        // Initialize an empty array for module instances
-        this.activeModules[instanceId] = [];
+          // Initialize an empty array for module instances
+          this.activeModules[instanceId] = [];
 
-        // Execute constructor methods (including "matrix") asynchronously
-        if (constructorMethods && constructorMethods.length > 0) {
-          // Schedule executeMethods to run asynchronously
-          Promise.resolve().then(() => {
-            this.executeMethods(
+          // Execute constructor methods (including "matrix") synchronously in the init chain
+          if (constructorMethods && constructorMethods.length > 0) {
+            await this.executeMethods(
               constructorMethods,
               instanceId,
               this.activeModules[instanceId],
               true
             );
-          });
+          }
         }
-      }
-    );
+      );
 
-    // Wait for all module initializations to complete
-    logger.log("⏳ [TRACK] Waiting for all modules to initialize...");
-    await Promise.all(moduleInitPromises);
-    logger.log("✅ [TRACK] All modules initialized");
+      // Wait for all module initializations to complete
+      logger.log("⏳ [TRACK] Waiting for all modules to initialize...");
+      await Promise.all(moduleInitPromises);
+      logger.log("✅ [TRACK] All modules initialized");
 
-    this.activeTrack = track;
-    logger.log(`✅✅✅ [TRACK] Track activated successfully: "${trackName}"`);
-    logger.log("📦 [TRACK] Active modules:", Object.keys(this.activeModules));
-    logger.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      logger.log(`✅✅✅ [TRACK] Track activated successfully: "${trackName}"`);
+      logger.log("📦 [TRACK] Active modules:", Object.keys(this.activeModules));
+      logger.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    } finally {
+      this.isLoadingTrack = false;
+    }
 
+    // Check if another track switch was requested during load
+    if (this.pendingTrackName) {
+      const nextTrack = this.pendingTrackName;
+      this.pendingTrackName = null;
+      logger.log(`🔄 [TRACK] Loading pending track: "${nextTrack}"`);
+      this.handleTrackSelection(nextTrack);
+      return;
+    }
+
+    // Only send ready when no pending track
     ipcRenderer.send("projector-to-dashboard", {
       type: "projector-ready",
       props: {},
@@ -631,6 +687,11 @@ const Projector = {
 
   async handleChannelMessage(channelPath, debugContext = {}) {
     if (!this.activeTrack) return;
+
+    if (this.isLoadingTrack) {
+      logger.warn(`Ignoring channel trigger during track initialization`);
+      return;
+    }
 
     const track = this.activeTrack;
     const channelMatch = channelPath.match(/^\/Ableton\/(\d+)$/);
@@ -743,24 +804,32 @@ const Projector = {
       otherMethods.map(async ({ name: methodName, options: methodOptions }) => {
         const options = fromPairs(
           map(methodOptions, ({ name, value, randomRange }) => {
-            if (randomRange && Array.isArray(randomRange) && randomRange.length === 2) {
+            if (
+              randomRange &&
+              Array.isArray(randomRange) &&
+              randomRange.length === 2
+            ) {
               let [min, max] = randomRange;
-              
-              if (typeof min !== 'number' || typeof max !== 'number') {
-                console.warn(`[Projector] Invalid randomRange for "${name}": [${min}, ${max}] - expected numbers. Using value: ${value}`);
+
+              if (typeof min !== "number" || typeof max !== "number") {
+                console.warn(
+                  `[Projector] Invalid randomRange for "${name}": [${min}, ${max}] - expected numbers. Using value: ${value}`
+                );
                 return [name, value];
               }
-              
+
               if (min > max) {
-                console.warn(`[Projector] Invalid randomRange for "${name}": min (${min}) > max (${max}). Swapping values.`);
+                console.warn(
+                  `[Projector] Invalid randomRange for "${name}": min (${min}) > max (${max}). Swapping values.`
+                );
                 [min, max] = [max, min];
               }
-              
+
               const randomValue =
                 Number.isInteger(min) && Number.isInteger(max)
                   ? Math.floor(Math.random() * (max - min + 1)) + min
                   : Math.random() * (max - min) + min;
-              
+
               return [name, randomValue];
             }
             return [name, value];

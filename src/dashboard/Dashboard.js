@@ -336,6 +336,10 @@ const Dashboard = () => {
     triggerMapsRef.current = buildMidiConfig(tracks, globalMappings, inputType);
   }, [userData?.sets, userData?.config?.input, activeSetId]);
 
+  // Track pending save timeouts for cancellation
+  const userDataSaveTimeoutRef = useRef(null);
+  const recordingDataSaveTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (isInitialMount.current) {
       return;
@@ -347,7 +351,9 @@ const Dashboard = () => {
 
     const debouncedSave = setTimeout(async () => {
       await saveUserData(userData);
+      userDataSaveTimeoutRef.current = null;
     }, 500);
+    userDataSaveTimeoutRef.current = debouncedSave;
     return () => clearTimeout(debouncedSave);
   }, [userData]);
 
@@ -377,7 +383,9 @@ const Dashboard = () => {
 
     const debouncedSave = setTimeout(async () => {
       await saveRecordingData(recordingData);
+      recordingDataSaveTimeoutRef.current = null;
     }, 500);
+    recordingDataSaveTimeoutRef.current = debouncedSave;
     return () => clearTimeout(debouncedSave);
   }, [recordingData]);
 
@@ -388,6 +396,17 @@ const Dashboard = () => {
           return;
         }
 
+        // Cancel any pending async saves
+        if (userDataSaveTimeoutRef.current) {
+          clearTimeout(userDataSaveTimeoutRef.current);
+          userDataSaveTimeoutRef.current = null;
+        }
+        if (recordingDataSaveTimeoutRef.current) {
+          clearTimeout(recordingDataSaveTimeoutRef.current);
+          recordingDataSaveTimeoutRef.current = null;
+        }
+
+        // Now do sync saves with latest state
         saveUserDataSync(userDataRef.current);
         saveRecordingDataSync(recordingDataRef.current);
         const appStateToSave = {
