@@ -506,7 +506,7 @@ function createWindow(projectDir) {
 
 // Handle app ready state
 app.whenReady().then(() => {
-  if (process.platform === "darwin") {
+  if (process.platform === "darwin" && !app.isPackaged) {
     try {
       const iconPath = path.join(
         __dirname,

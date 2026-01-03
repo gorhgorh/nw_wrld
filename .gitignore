@@ -4,8 +4,12 @@ node_modules/
 
 # Build outputs
 dist/
-build/
 out/
+
+# electron-builder "build resources" (we keep only icon assets tracked)
+build/*
+!build/logo.icns
+!build/logo.png
 
 # Packaged app artifacts (generated)
 release/

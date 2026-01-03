@@ -101,7 +101,8 @@
     "mac": {
       "target": [
         "dmg"
-      ]
+      ],
+      "icon": "build/logo.icns"
     }
   }
 }
