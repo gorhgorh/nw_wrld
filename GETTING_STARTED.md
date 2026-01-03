@@ -78,6 +78,8 @@ nw_wrld will initialize your project folder with:
 - **Sample assets** - Images and JSON data files for experimentation
 - **Data storage** - Configuration, tracks, and recordings
 
+**Note:** Workspace modules are JavaScript code executed by nw_wrld. Only open project folders you trust.
+
 Your project folder structure will look like this:
 
 ```

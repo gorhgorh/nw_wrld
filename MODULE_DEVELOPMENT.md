@@ -28,8 +28,10 @@ Modules live in your **project's `modules/` folder**, not in the application sou
 - ✅ Edit modules without touching application code
 - ✅ Hot-reload: changes apply immediately when you save
 - ✅ Portability: share project folders with modules intact
-- ✅ Sandboxing: modules can't access files outside the workspace
+- ✅ Trusted project code: modules are JavaScript files executed by nw_wrld
 - ✅ No build step: pure JavaScript, runs directly
+
+**Trust note:** Only open project folders you trust. Workspace modules are code.
 
 ### Where Modules Live
 
@@ -473,7 +475,7 @@ if (imageUrl) {
 
 **Returns:** `string | null` - File URL or null if invalid
 
-**Security:** Paths are sandboxed to the `assets/` folder. Attempts to access files outside the workspace will return null.
+**Path safety:** Paths are constrained to the `assets/` folder. Attempts to access files outside the project assets will return null.
 
 #### loadJson(path)
 
@@ -718,7 +720,7 @@ nwWrldSdk.readText("data/text.txt");
 ```javascript
 nwWrldSdk.assetUrl("/images/photo.png"); // Don't start with /
 nwWrldSdk.assetUrl("../other/file.png"); // Can't escape assets folder
-nwWrldSdk.assetUrl("/etc/passwd"); // Security: sandboxed to assets/
+nwWrldSdk.assetUrl("/etc/passwd"); // Path safety: constrained to assets/
 ```
 
 ### Starter Assets

@@ -996,7 +996,11 @@ const Dashboard = () => {
           jsFiles.map(async (file) => {
             const fullPath = path.join(modulesDir, file);
             try {
-              const fileUrl = pathToFileURL(fullPath).href;
+              let mtimeMs = Date.now();
+              try {
+                mtimeMs = (await fs.promises.stat(fullPath)).mtimeMs;
+              } catch {}
+              const fileUrl = `${pathToFileURL(fullPath).href}?t=${mtimeMs}`;
               const imported = await import(/* webpackIgnore: true */ fileUrl);
               const mod = imported?.default || imported;
               if (!mod?.name) {
@@ -1022,10 +1026,8 @@ const Dashboard = () => {
         const validModules = modules.filter(Boolean);
         setPredefinedModules(validModules);
         setWorkspaceModuleLoadFailures(Array.from(loadFailures));
-        if (!hadImportError) {
-          setIsProjectorReady(false);
-          sendToProjector("refresh-projector", {});
-        }
+        setIsProjectorReady(false);
+        sendToProjector("refresh-projector", {});
         return;
       }
     } catch (error) {
@@ -1042,7 +1044,7 @@ const Dashboard = () => {
     "workspace:modulesChanged",
     () => {
       if (workspacePath) {
-        window.location.reload();
+        loadModules();
         return;
       }
       loadModules();

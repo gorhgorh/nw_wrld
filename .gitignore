@@ -6,7 +6,6 @@ node_modules/
 dist/
 build/
 out/
-src/shared/json/*.json
 
 # Packaged app artifacts (generated)
 release/

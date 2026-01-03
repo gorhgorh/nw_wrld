@@ -352,6 +352,13 @@ ipcMain.handle("workspace:select", async () => {
   maybeMigrateJsonIntoProject(workspacePath);
   currentProjectDir = workspacePath;
 
+  if (inputManager) {
+    try {
+      await inputManager.disconnect();
+    } catch {}
+    inputManager = null;
+  }
+
   const closeWindow = (win) =>
     new Promise((resolve) => {
       if (!win || win.isDestroyed()) return resolve();

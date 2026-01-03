@@ -5,7 +5,7 @@ nw_wrld is an event-driven sequencer for triggering visuals using web technologi
 Visuals can be triggered via the built-in 16-step sequencer or by configuring external MIDI/OSC inputs.
 
 ![Node Version](https://img.shields.io/badge/node-%5E18.0.0-brightgreen)
-![Electron](https://img.shields.io/badge/electron-v28.0.0-blue)
+![Electron](https://img.shields.io/badge/electron-v39.2.7-blue)
 
 ---
 
@@ -61,6 +61,8 @@ Two windows will open:
 ## Project Folders
 
 nw_wrld uses a **project folder** model. Each project is a self-contained folder containing your modules, assets, and data.
+
+**Note:** Workspace modules are JavaScript code executed by nw_wrld. Only open project folders you trust.
 
 ### What's Inside a Project Folder
 
