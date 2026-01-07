@@ -57,7 +57,14 @@ class PerlinBlob extends ModuleBase {
       name: "loadData",
       executeOnLoad: true,
       options: [
-        { name: "dataPath", defaultVal: "json/radiation.json", type: "text" },
+        {
+          name: "dataPath",
+          defaultVal: "json/radiation.json",
+          type: "assetFile",
+          assetBaseDir: "json",
+          assetExtensions: [".json"],
+          allowCustom: true,
+        },
         { name: "valueKey", defaultVal: "Estimated DGSR", type: "text" },
         {
           name: "maxPoints",
