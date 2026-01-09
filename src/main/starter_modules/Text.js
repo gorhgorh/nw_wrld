@@ -1,8 +1,25 @@
 /*
 @nwWrld name: Text
 @nwWrld category: Text
-@nwWrld imports: ModuleBase
+@nwWrld imports: ModuleBase, assetUrl
 */
+
+const FONT_FILE_EXT_RE = /\.(ttf|otf|woff2?|ttc)$/i;
+const loadedFontByUrl = new Map();
+
+const normalizeRelAssetPath = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return raw.replace(/^assets\//, "");
+};
+
+const guessFamilyFromFilename = (relPath) => {
+  const raw = String(relPath ?? "").trim();
+  const base = raw.split("/").filter(Boolean).pop() || "";
+  const noExt = base.replace(/\.[^.]+$/, "");
+  const cleaned = noExt.replace(/[^A-Za-z0-9 _-]+/g, " ").replace(/\s+/g, " ");
+  return cleaned.trim() || "nw_wrld_font";
+};
 
 class Text extends ModuleBase {
   static methods = [
@@ -30,9 +47,11 @@ class Text extends ModuleBase {
       options: [
         {
           name: "font",
-          defaultVal: "font-monospace",
-          type: "select",
-          values: ["font-monospace"],
+          defaultVal: "fonts/RobotoMono-VariableFont_wght.ttf",
+          type: "assetFile",
+          assetBaseDir: "fonts",
+          assetExtensions: [".ttf", ".otf", ".woff", ".woff2", ".ttc"],
+          allowCustom: true,
         },
       ],
     },
@@ -104,10 +123,56 @@ class Text extends ModuleBase {
     }
   }
 
-  font({ font = "font-monospace" } = {}) {
-    if (this.textElem) {
-      this.textElem.className = font;
+  async font({ font = "fonts/RobotoMono-VariableFont_wght.ttf" } = {}) {
+    if (!this.textElem) return;
+
+    const raw = String(font ?? "").trim();
+    if (!raw) return;
+
+    if (raw === "font-monospace") {
+      this.textElem.className = "";
+      this.textElem.style.fontFamily = "monospace";
+      return;
     }
+
+    if (!FONT_FILE_EXT_RE.test(raw)) {
+      this.textElem.className = raw;
+      return;
+    }
+
+    const relPath = normalizeRelAssetPath(raw);
+    const url =
+      typeof assetUrl === "function" && relPath ? assetUrl(relPath) : null;
+    if (!url) {
+      this.textElem.className = "";
+      this.textElem.style.fontFamily = "monospace";
+      return;
+    }
+
+    if (!loadedFontByUrl.has(url)) {
+      const family = guessFamilyFromFilename(relPath);
+      const p = (async () => {
+        try {
+          const FontFaceCtor = globalThis.FontFace;
+          if (typeof FontFaceCtor !== "function") return null;
+          const ff = new FontFaceCtor(family, `url(${url})`);
+          const loaded = await ff.load();
+          try {
+            globalThis.document?.fonts?.add?.(loaded);
+          } catch {}
+          return family;
+        } catch {
+          return null;
+        }
+      })();
+      loadedFontByUrl.set(url, p);
+    }
+
+    const family = await loadedFontByUrl.get(url);
+    this.textElem.className = "";
+    this.textElem.style.fontFamily = family
+      ? `"${family}", monospace`
+      : "monospace";
   }
 
   reset() {
