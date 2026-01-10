@@ -115,7 +115,10 @@
       "src/dashboard/views/**",
       "src/dashboard/assets/audio/**",
       "src/shared/**",
-      "src/assets/**"
+      "src/assets/**",
+      "!**/node_modules/**/prebuilds/android-*/**",
+      "!**/node_modules/**/prebuilds/linux-*/**",
+      "!**/node_modules/**/prebuilds/win32-*/**"
     ],
     "mac": {
       "target": [
@@ -124,7 +127,7 @@
       "icon": "build/logo.icns",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "notarize": true
     },
     "win": {
