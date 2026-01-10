@@ -16,6 +16,8 @@ const SortableTrackItem = ({
   track,
   trackIndex,
   activeTrackId,
+  inputType,
+  globalMappings,
   onTrackSelect,
   onEdit,
   onDelete,
@@ -44,7 +46,17 @@ const SortableTrackItem = ({
                 : "text-neutral-300/30"
             }`}
           >
-            {track.name} ({track.modules?.length || 0} modules)
+            {(() => {
+              const slot = track?.trackSlot;
+              const trigger =
+                slot && globalMappings?.trackMappings?.[inputType]?.[slot]
+                  ? globalMappings.trackMappings[inputType][slot]
+                  : "";
+              const modulesCount = track.modules?.length || 0;
+              return trigger
+                ? `${track.name} (${trigger}) (${modulesCount} modules)`
+                : `${track.name} (${modulesCount} modules)`;
+            })()}
           </label>
           <button
             onClick={() => onEdit(trackIndex)}
@@ -81,6 +93,8 @@ export const SelectTrackModal = ({
 
   const tracks = getActiveSetTracks(userData, activeSetId);
   const activeSet = getActiveSet(userData, activeSetId);
+  const inputType = userData?.config?.input?.type || "midi";
+  const globalMappings = userData?.config || {};
 
   const handleTrackSelect = (trackId) => {
     setActiveTrackId(trackId);
@@ -142,6 +156,8 @@ export const SelectTrackModal = ({
                       track={track}
                       trackIndex={trackIndex}
                       activeTrackId={activeTrackId}
+                      inputType={inputType}
+                      globalMappings={globalMappings}
                       onTrackSelect={handleTrackSelect}
                       onEdit={setEditingTrackIndex}
                       onDelete={handleDeleteTrack}

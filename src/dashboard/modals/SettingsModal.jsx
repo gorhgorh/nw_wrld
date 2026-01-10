@@ -14,6 +14,12 @@ import { HELP_TEXT } from "../../shared/helpText.js";
 
 const isValidHexColor = (value) => /^#([0-9A-F]{3}){1,2}$/i.test(value);
 
+const clampMidiChannel = (value, fallback = 1) => {
+  const n = parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(16, n));
+};
+
 const normalizeHexColor = (value) => {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -375,6 +381,59 @@ export const SettingsModal = ({
                         </Select>
                       );
                     })()}
+                  </div>
+
+                  <div className="pl-12">
+                    <div className="mb-1 text-[11px] relative inline-block">
+                      <span className="opacity-50">MIDI Channels:</span>
+                      <HelpIcon helpText={HELP_TEXT.midiChannels} />
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <div className="opacity-50 mb-1 text-[11px]">
+                          Track Select:
+                        </div>
+                        <DraftIntInput
+                          value={inputConfig.trackSelectionChannel ?? 1}
+                          fallback={inputConfig.trackSelectionChannel ?? 1}
+                          onCommit={(next) =>
+                            setInputConfig({
+                              ...inputConfig,
+                              trackSelectionChannel: clampMidiChannel(
+                                next,
+                                inputConfig.trackSelectionChannel ?? 1
+                              ),
+                            })
+                          }
+                          min={1}
+                          max={16}
+                          className="py-1 w-full"
+                          style={{ width: "100%" }}
+                        />
+                      </div>
+                      <div>
+                        <div className="opacity-50 mb-1 text-[11px]">
+                          Method Triggers:
+                        </div>
+                        <DraftIntInput
+                          value={inputConfig.methodTriggerChannel ?? 2}
+                          fallback={inputConfig.methodTriggerChannel ?? 2}
+                          onCommit={(next) =>
+                            setInputConfig({
+                              ...inputConfig,
+                              methodTriggerChannel: clampMidiChannel(
+                                next,
+                                inputConfig.methodTriggerChannel ?? 2
+                              ),
+                            })
+                          }
+                          min={1}
+                          max={16}
+                          className="py-1 w-full"
+                          style={{ width: "100%" }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="pl-12">

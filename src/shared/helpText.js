@@ -25,6 +25,8 @@ export const HELP_TEXT = {
     "Triggerable methods here are from the static methods array in your file. Click the play icon to test methods with their current parameter values.",
   inputType:
     "Choose how the app receives triggers: MIDI (hardware/IAC Driver), OSC (network messages from TouchOSC, Max/MSP, etc.).",
+  midiChannels:
+    "MIDI message channels used for external triggers. Track Select chooses which MIDI channel activates tracks; Triggers chooses which MIDI channel fires channel slots on the active track.",
   trackTrigger:
     "The identifier that activates this track. For MIDI: use note names (C-1, F#2). For OSC: use /track/name pattern (e.g., /track/intro).",
   trackSlot:

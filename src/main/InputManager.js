@@ -137,10 +137,12 @@ class InputManager {
             if (channel === midiConfig.trackSelectionChannel) {
               this.broadcast("track-selection", {
                 note,
+                channel,
                 velocity,
                 source: "midi",
               });
-            } else if (channel === midiConfig.methodTriggerChannel) {
+            }
+            if (channel === midiConfig.methodTriggerChannel) {
               this.broadcast("method-trigger", {
                 note,
                 channel,

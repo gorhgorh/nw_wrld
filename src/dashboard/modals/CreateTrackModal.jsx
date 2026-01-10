@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
 import { ModalHeader } from "../components/ModalHeader.js";
@@ -37,6 +37,16 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }) => {
 
   const resolvedTrigger = getTrigger(trackSlot);
 
+  const takenSlotToTrackName = useMemo(() => {
+    const map = new Map();
+    tracks.forEach((t) => {
+      const slot = t?.trackSlot;
+      if (!slot) return;
+      map.set(slot, String(t?.name || "").trim() || `Track ${slot}`);
+    });
+    return map;
+  }, [tracks]);
+
   useEffect(() => {
     if (!isOpen) {
       setTrackName("");
@@ -48,7 +58,11 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }) => {
 
   if (!isOpen) return null;
 
-  const canSubmit = validation.isValid && trackSlot && !submitting;
+  const canSubmit =
+    validation.isValid &&
+    trackSlot &&
+    !submitting &&
+    availableSlots.includes(trackSlot);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -112,12 +126,20 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }) => {
             {availableSlots.length === 0 && (
               <option value="">No tracks available (max 10 tracks)</option>
             )}
-            {availableSlots.map((slot) => {
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((slot) => {
               const trigger =
                 globalMappings.trackMappings?.[inputType]?.[slot] || "";
+              const takenBy = takenSlotToTrackName.get(slot) || "";
+              const isTaken = Boolean(takenBy);
               return (
-                <option key={slot} value={slot} className="bg-[#101010]">
+                <option
+                  key={slot}
+                  value={slot}
+                  className="bg-[#101010]"
+                  disabled={isTaken}
+                >
                   Track {slot} ({trigger || "not configured"})
+                  {isTaken ? ` — used by ${takenBy}` : ""}
                 </option>
               );
             })}

@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
 import { ModalHeader } from "../components/ModalHeader.js";
-import { Button } from "../components/Button.js";
-import { TextInput } from "../components/FormInputs.js";
+import { TextInput, RadioButton } from "../components/FormInputs.js";
 import { userDataAtom } from "../core/state.js";
 import { updateUserData } from "../core/utils.js";
 import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig.js";
@@ -40,27 +39,46 @@ export const InputMappingsModal = ({ isOpen, onClose }) => {
       <ModalHeader title="INPUT MAPPINGS" onClose={onClose} />
 
       <div className="flex flex-col gap-6">
-        <div className="flex gap-2 border-b border-neutral-800 pb-4">
-          <Button
-            onClick={() => setActiveTab("midi")}
-            type={activeTab === "midi" ? "primary" : "secondary"}
-            className="flex-1"
-          >
-            MIDI
-          </Button>
-          <Button
-            onClick={() => setActiveTab("osc")}
-            type={activeTab === "osc" ? "primary" : "secondary"}
-            className="flex-1"
-          >
-            OSC
-          </Button>
+        <div className="flex flex-col gap-2 border-b border-neutral-800 pb-4 font-mono">
+          <div className="text-neutral-300 text-[11px]">Mapping Type:</div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 py-1">
+              <RadioButton
+                id="input-mappings-midi"
+                name="input-mappings-tab"
+                value="midi"
+                checked={activeTab === "midi"}
+                onChange={() => setActiveTab("midi")}
+              />
+              <label
+                htmlFor="input-mappings-midi"
+                className="cursor-pointer text-[11px] font-mono text-neutral-300"
+              >
+                MIDI
+              </label>
+            </div>
+            <div className="flex items-center gap-3 py-1">
+              <RadioButton
+                id="input-mappings-osc"
+                name="input-mappings-tab"
+                value="osc"
+                checked={activeTab === "osc"}
+                onChange={() => setActiveTab("osc")}
+              />
+              <label
+                htmlFor="input-mappings-osc"
+                className="cursor-pointer text-[11px] font-mono text-neutral-300"
+              >
+                OSC
+              </label>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-6">
           <div>
             <div className="text-neutral-300 text-[11px] mb-3 font-mono">
-              Track Mappings (1-10):
+              Track Trigger Mappings (1-10):
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((slot) => (
@@ -83,7 +101,7 @@ export const InputMappingsModal = ({ isOpen, onClose }) => {
 
           <div>
             <div className="text-neutral-300 text-[11px] mb-3 font-mono">
-              Channel Mappings (1-16):
+              Trigger Slot Mappings (1-16):
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(
@@ -109,7 +127,7 @@ export const InputMappingsModal = ({ isOpen, onClose }) => {
 
         <div className="text-neutral-500 text-[10px] font-mono border-t border-neutral-800 pt-4">
           These mappings define what trigger values are used for each slot
-          across all tracks and channels.
+          across all tracks.
         </div>
       </div>
     </Modal>
