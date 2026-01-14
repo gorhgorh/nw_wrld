@@ -21,7 +21,7 @@ import { loadSettingsSync } from "../shared/json/configUtils.ts";
 import { getActiveSetTracks, migrateToSets } from "../shared/utils/setUtils.ts";
 import { buildMethodOptions } from "../shared/utils/methodOptions.ts";
 import { getProjectDir } from "../shared/utils/projectDir.ts";
-import logger from "./helpers/logger.js";
+import logger from "./helpers/logger";
 const getBridge = () => globalThis.nwWrldBridge;
 
 const getMessaging = () => getBridge()?.messaging;

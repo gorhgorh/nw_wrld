@@ -1,4 +1,4 @@
-// src/projector/helpers/logger.js
+// src/projector/helpers/logger.ts
 
 /**
  * Logger - Conditional logging utility for performance-critical code
@@ -13,10 +13,18 @@
  * - console.error is always active for critical errors
  */
 
+type NwWrldBridge = {
+  app?: {
+    isPackaged?: unknown;
+  };
+};
+
 const isPackaged = (() => {
   try {
-    const bridge = globalThis.nwWrldBridge;
-    const fn = bridge?.app?.isPackaged;
+    const bridge = (globalThis as typeof globalThis & { nwWrldBridge?: unknown })
+      .nwWrldBridge;
+    const b = bridge as NwWrldBridge | null | undefined;
+    const fn = b?.app?.isPackaged;
     if (typeof fn === "function") return Boolean(fn());
   } catch {}
   return true;
@@ -43,3 +51,4 @@ export const logger = {
 };
 
 export default logger;
+

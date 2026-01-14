@@ -1,4 +1,4 @@
-// src/projector/helpers/animationManager.js
+// src/projector/helpers/animationManager.ts
 
 import TWEEN from "@tweenjs/tween.js";
 
@@ -15,17 +15,21 @@ import TWEEN from "@tweenjs/tween.js";
  * - Automatic cleanup when no subscribers remain
  */
 class AnimationManager {
+  private subscribers: Set<() => void>;
+  private rafId: number | null;
+  private tickBound: () => void;
+
   constructor() {
     this.subscribers = new Set();
     this.rafId = null;
-    this.tick = this.tick.bind(this);
+    this.tickBound = this.tick.bind(this);
   }
 
   /**
    * Register a callback to be called on every animation frame
    * @param {Function} callback - The animation callback to execute each frame
    */
-  subscribe(callback) {
+  subscribe(callback: unknown) {
     if (typeof callback !== "function") {
       console.error(
         "[AnimationManager] Subscribe called with non-function:",
@@ -34,7 +38,8 @@ class AnimationManager {
       return;
     }
 
-    this.subscribers.add(callback);
+    const cb = callback as () => void;
+    this.subscribers.add(cb);
 
     // Start the loop if this is the first subscriber
     if (!this.rafId) {
@@ -46,7 +51,7 @@ class AnimationManager {
    * Unregister a callback from the animation loop
    * @param {Function} callback - The callback to remove
    */
-  unsubscribe(callback) {
+  unsubscribe(callback: () => void) {
     this.subscribers.delete(callback);
 
     // Stop the loop if no subscribers remain
@@ -58,7 +63,7 @@ class AnimationManager {
   /**
    * Main animation loop tick - executes all subscribed callbacks
    */
-  tick() {
+  private tick() {
     // Update tweens ONCE per frame globally
     TWEEN.update();
 
@@ -66,7 +71,7 @@ class AnimationManager {
     this.subscribers.forEach((callback) => {
       try {
         callback();
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(
           "[AnimationManager] Error in subscriber callback:",
           error
@@ -74,7 +79,7 @@ class AnimationManager {
       }
     });
 
-    this.rafId = requestAnimationFrame(this.tick);
+    this.rafId = requestAnimationFrame(this.tickBound);
   }
 
   /**
@@ -82,7 +87,7 @@ class AnimationManager {
    */
   start() {
     if (!this.rafId) {
-      this.rafId = requestAnimationFrame(this.tick);
+      this.rafId = requestAnimationFrame(this.tickBound);
     }
   }
 
@@ -106,3 +111,4 @@ class AnimationManager {
 
 // Singleton instance - shared across all modules
 export const animationManager = new AnimationManager();
+

@@ -48,6 +48,9 @@
     "src/main/mainProcess/appSetup.ts",
     "src/main/workspaceStarterModules.ts",
     "src/main/workspaceStarterAssets.ts",
-    "src/main/InputManager.ts"
+    "src/main/InputManager.ts",
+    "src/rendererPolyfills.ts",
+    "src/projector/helpers/logger.ts",
+    "src/projector/helpers/animationManager.ts"
   ]
 }

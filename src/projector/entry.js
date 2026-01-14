@@ -1,4 +1,4 @@
-import "../rendererPolyfills.js";
+import "../rendererPolyfills";
 import "../shared/styles/_main.css";
 import Projector from "./Projector.js";
 

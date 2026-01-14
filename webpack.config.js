@@ -7,8 +7,8 @@ module.exports = (env, argv) => {
   return {
     mode,
     entry: {
-      dashboard: ["./src/rendererPolyfills.js", "./src/dashboard/entry.js"],
-      projector: ["./src/rendererPolyfills.js", "./src/projector/entry.js"],
+      dashboard: ["./src/rendererPolyfills.ts", "./src/dashboard/entry.js"],
+      projector: ["./src/rendererPolyfills.ts", "./src/projector/entry.js"],
       moduleSandbox: "./src/projector/moduleSandboxEntry.js",
     },
     resolve: {
@@ -29,10 +29,7 @@ module.exports = (env, argv) => {
       rules: [
         {
           test: /\.ts$/,
-          include: [
-            path.resolve(__dirname, "src", "shared"),
-            path.resolve(__dirname, "src", "dashboard"),
-          ],
+          include: [path.resolve(__dirname, "src")],
           exclude: /node_modules/,
           use: {
             loader: "babel-loader",

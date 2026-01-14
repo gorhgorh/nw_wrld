@@ -21,7 +21,7 @@ import ModuleBase from "./moduleBase.js"; // Ensure correct casing
 import * as THREE from "three"; // "three": "^0.159.0"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import TWEEN from "@tweenjs/tween.js"; // Ensure you have Tween.js installed: npm install @tweenjs/tween.js
-import { animationManager } from "./animationManager.js";
+import { animationManager } from "./animationManager";
 
 export class BaseThreeJsModule extends ModuleBase {
   static methods = [
