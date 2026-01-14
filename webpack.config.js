@@ -30,11 +30,8 @@ module.exports = (env, argv) => {
         {
           test: /\.ts$/,
           include: [
-            path.resolve(__dirname, "src", "shared", "json"),
-            path.resolve(__dirname, "src", "shared", "utils"),
-            path.resolve(__dirname, "src", "shared", "midi"),
-            path.resolve(__dirname, "src", "shared", "config"),
-            path.resolve(__dirname, "src", "shared", "nwWrldDocblock.ts"),
+            path.resolve(__dirname, "src", "shared"),
+            path.resolve(__dirname, "src", "dashboard"),
           ],
           exclude: /node_modules/,
           use: {

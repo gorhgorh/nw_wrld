@@ -14,4 +14,5 @@ export const TERMINAL_STYLES = {
   fontSize: "11px",
   lineHeight: "1.5",
   spacing: "2px",
-};
+} as const;
+

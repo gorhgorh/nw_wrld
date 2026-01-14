@@ -27,8 +27,8 @@ import {
 } from "../core/state.js";
 import { updateActiveSet, getMethodsByLayer } from "../core/utils.js";
 import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
-import { getBaseMethodNames } from "../utils/moduleUtils.js";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { getBaseMethodNames } from "../utils/moduleUtils.ts";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 import { MethodCodeModal } from "./MethodCodeModal.jsx";
 
 const SortableItem = React.memo(

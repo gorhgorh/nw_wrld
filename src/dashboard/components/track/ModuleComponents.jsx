@@ -18,7 +18,7 @@ import {
   useFlashingChannels,
 } from "../../core/state.js";
 import { updateActiveSet } from "../../core/utils.js";
-import { TERMINAL_STYLES } from "../../core/constants.js";
+import { TERMINAL_STYLES } from "../../core/constants.ts";
 import { getActiveSetTracks } from "../../../shared/utils/setUtils.ts";
 import {
   getRecordingForTrack,

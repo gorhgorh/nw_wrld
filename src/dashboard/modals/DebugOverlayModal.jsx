@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo } from "react";
 import { Button } from "../components/Button.js";
 import { HelpIcon } from "../components/HelpIcon.js";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const renderColoredLog = (log) => {
   const lines = log.split("\n");

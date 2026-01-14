@@ -1,4 +1,4 @@
-export const HELP_TEXT = {
+export const HELP_TEXT: Record<string, string> = {
   trackNote:
     "The MIDI note or OSC address that activates this track. When triggered, the track becomes active and its modules load.",
   modules:
@@ -45,6 +45,5 @@ export const HELP_TEXT = {
     "Choose your signal source. Sequencer (default): program patterns with a 16-step grid. External: connect MIDI/OSC hardware for live performance.",
   sequencerGrid:
     "Program 16-step patterns here. Each row is a channel; lit steps trigger the channel on that beat.",
-  sequencerBpm:
-    "Set the sequencer tempo in BPM. Controls playback speed when using the sequencer.",
+  sequencerBpm: "Set the sequencer tempo in BPM. Controls playback speed when using the sequencer.",
 };

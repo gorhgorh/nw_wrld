@@ -3,6 +3,8 @@ import * as path from "node:path";
 
 import { state, srcDir } from "./state";
 import { isExistingDirectory } from "./pathSafety";
+import { ensureWorkspaceStarterModules } from "../workspaceStarterModules";
+import { ensureWorkspaceStarterAssets } from "../workspaceStarterAssets";
 
 type ElectronIpcMain = {
   handle(
@@ -21,18 +23,6 @@ const { ipcMain, dialog } = require("electron") as {
   ipcMain: ElectronIpcMain;
   dialog: ElectronDialog;
 };
-
-const { ensureWorkspaceStarterModules } = require(path.join(
-  srcDir,
-  "main",
-  "workspaceStarterModules"
-)) as { ensureWorkspaceStarterModules: (modulesDir: string) => void };
-
-const { ensureWorkspaceStarterAssets } = require(path.join(
-  srcDir,
-  "main",
-  "workspaceStarterAssets"
-)) as { ensureWorkspaceStarterAssets: (workspacePath: string) => void };
 
 const getLegacyJsonDirForMain = () =>
   path.join(srcDir, "..", "src", "shared", "json");

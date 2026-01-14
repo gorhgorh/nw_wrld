@@ -1,13 +1,15 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const ensureDir = (dirPath) => {
+import { srcDir } from "./mainProcess/state";
+
+const ensureDir = (dirPath: string) => {
   try {
     fs.mkdirSync(dirPath, { recursive: true });
   } catch {}
 };
 
-const safeCopyIfMissing = (srcPath, destPath) => {
+const safeCopyIfMissing = (srcPath: string, destPath: string) => {
   try {
     if (fs.existsSync(destPath)) return;
     if (!fs.existsSync(srcPath)) return;
@@ -15,7 +17,7 @@ const safeCopyIfMissing = (srcPath, destPath) => {
   } catch {}
 };
 
-function ensureWorkspaceStarterAssets(workspacePath) {
+export function ensureWorkspaceStarterAssets(workspacePath: string) {
   if (!workspacePath || typeof workspacePath !== "string") return;
 
   const assetsDir = path.join(workspacePath, "assets");
@@ -29,7 +31,7 @@ function ensureWorkspaceStarterAssets(workspacePath) {
   ensureDir(modelsDir);
   ensureDir(fontsDir);
 
-  const srcAssetsDir = path.join(__dirname, "..", "assets");
+  const srcAssetsDir = path.join(srcDir, "assets");
   safeCopyIfMissing(
     path.join(srcAssetsDir, "json", "meteor.json"),
     path.join(jsonDir, "meteor.json")
@@ -72,5 +74,3 @@ function ensureWorkspaceStarterAssets(workspacePath) {
     path.join(fontsDir, "RobotoMono-Italic-VariableFont_wght.ttf")
   );
 }
-
-module.exports = { ensureWorkspaceStarterAssets };

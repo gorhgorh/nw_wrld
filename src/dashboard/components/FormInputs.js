@@ -1,5 +1,7 @@
 import React from "react";
-import { TERMINAL_STYLES } from "../core/constants.js";
+import { TERMINAL_STYLES } from "../core/constants.ts";
+
+export { TERMINAL_STYLES };
 
 export const TextInput = ({ style, ...props }) => {
   return (
@@ -168,10 +170,6 @@ export const Label = ({ style, children, ...props }) => {
 
 export const ValidationError = ({ value, validation }) => {
   if (value.trim().length === 0 || validation.isValid) return null;
-  
-  return (
-    <div className="text-red-400 text-[11px] mt-1 font-mono">
-      {validation.errorMessage}
-    </div>
-  );
+
+  return <div className="text-red-400 text-[11px] mt-1 font-mono">{validation.errorMessage}</div>;
 };

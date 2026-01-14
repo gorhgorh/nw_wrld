@@ -9,10 +9,10 @@ import {
   Checkbox,
   TERMINAL_STYLES,
 } from "./FormInputs.js";
-import { getBaseMethodNames } from "../utils/moduleUtils.js";
+import { getBaseMethodNames } from "../utils/moduleUtils.ts";
 import { MethodBlock } from "./MethodBlock.js";
 import { HelpIcon } from "./HelpIcon.js";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const getBridge = () => globalThis.nwWrldBridge;
 

@@ -9,7 +9,7 @@ import { HelpIcon } from "../components/HelpIcon.js";
 import { userDataAtom, activeSetIdAtom } from "../core/state.js";
 import { updateActiveSet, updateUserData } from "../core/utils.js";
 import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 import {
   parsePitchClass,
   pitchClassToName,

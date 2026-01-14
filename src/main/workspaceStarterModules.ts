@@ -1,13 +1,15 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-const STARTER_MODULES_DIR = path.join(__dirname, "starter_modules");
+import { srcDir } from "./mainProcess/state";
 
-function ensureWorkspaceStarterModules(modulesDir) {
+const STARTER_MODULES_DIR = path.join(srcDir, "main", "starter_modules");
+
+export function ensureWorkspaceStarterModules(modulesDir: string) {
   if (!modulesDir || typeof modulesDir !== "string") return;
   if (!fs.existsSync(modulesDir)) return;
 
-  let entries = [];
+  let entries: fs.Dirent[] = [];
   try {
     entries = fs.readdirSync(STARTER_MODULES_DIR, { withFileTypes: true });
   } catch {
@@ -26,5 +28,3 @@ function ensureWorkspaceStarterModules(modulesDir) {
       } catch {}
     });
 }
-
-module.exports = { ensureWorkspaceStarterModules };

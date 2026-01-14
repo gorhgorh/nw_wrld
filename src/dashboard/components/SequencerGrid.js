@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { NumberInput } from "./FormInputs.js";
 import { HelpIcon } from "./HelpIcon.js";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 
 export const SequencerGrid = ({
   track,

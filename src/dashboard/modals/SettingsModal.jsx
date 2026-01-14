@@ -10,7 +10,7 @@ import {
   TextInput,
 } from "../components/FormInputs.js";
 import { HelpIcon } from "../components/HelpIcon.js";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const isValidHexColor = (value) => /^#([0-9A-F]{3}){1,2}$/i.test(value);
 
@@ -20,8 +20,7 @@ const clampMidiChannel = (value, fallback = 1) => {
   return Math.max(1, Math.min(16, n));
 };
 
-const normalizeMidiNoteMatchMode = (value) =>
-  value === "exactNote" ? "exactNote" : "pitchClass";
+const normalizeMidiNoteMatchMode = (value) => (value === "exactNote" ? "exactNote" : "pitchClass");
 
 const normalizeHexColor = (value) => {
   const raw = String(value || "").trim();
@@ -53,12 +52,7 @@ const DraftIntInput = React.memo(({ value, fallback, onCommit, ...props }) => {
     (raw) => {
       const s = String(raw);
       const isIntermediate =
-        s === "" ||
-        s === "-" ||
-        s === "." ||
-        s === "-." ||
-        s.endsWith(".") ||
-        /e[+-]?$/i.test(s);
+        s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
       if (isIntermediate) return;
       const n = parseInt(s, 10);
       if (!Number.isFinite(n)) return;
@@ -71,12 +65,7 @@ const DraftIntInput = React.memo(({ value, fallback, onCommit, ...props }) => {
     if (draft === null) return;
     const s = String(draft);
     const isIntermediate =
-      s === "" ||
-      s === "-" ||
-      s === "." ||
-      s === "-." ||
-      s.endsWith(".") ||
-      /e[+-]?$/i.test(s);
+      s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
     if (isIntermediate) {
       onCommit(fallback);
       return;
@@ -197,22 +186,14 @@ const UserColors = ({ config, updateConfig }) => {
             ))}
           </div>
         ) : (
-          <div className="mt-2 text-[10px] text-neutral-500">
-            No user colors saved.
-          </div>
+          <div className="mt-2 text-[10px] text-neutral-500">No user colors saved.</div>
         )}
       </div>
     </div>
   );
 };
 
-const ProjectorSettings = ({
-  aspectRatio,
-  setAspectRatio,
-  bgColor,
-  setBgColor,
-  settings,
-}) => {
+const ProjectorSettings = ({ aspectRatio, setAspectRatio, bgColor, setBgColor, settings }) => {
   return (
     <div className="flex flex-col gap-3 font-mono">
       <div className="pl-12">
@@ -274,8 +255,8 @@ export const SettingsModal = ({
   const signalSourceValue = config.sequencerMode
     ? "sequencer"
     : normalizedInputType === "osc"
-    ? "external-osc"
-    : "external-midi";
+      ? "external-osc"
+      : "external-midi";
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -348,15 +329,11 @@ export const SettingsModal = ({
               {normalizedInputType === "midi" && (
                 <>
                   <div className="pl-12">
-                    <div className="opacity-50 mb-1 text-[11px]">
-                      MIDI Device:
-                    </div>
+                    <div className="opacity-50 mb-1 text-[11px]">MIDI Device:</div>
                     {(() => {
                       const selectedMidiDeviceId =
                         inputConfig.deviceId ||
-                        (availableMidiDevices.find(
-                          (d) => d.name === inputConfig.deviceName
-                        )?.id ??
+                        (availableMidiDevices.find((d) => d.name === inputConfig.deviceName)?.id ??
                           "");
                       return (
                         <Select
@@ -379,11 +356,7 @@ export const SettingsModal = ({
                             Not configured
                           </option>
                           {availableMidiDevices.map((device) => (
-                            <option
-                              key={device.id}
-                              value={device.id}
-                              className="bg-[#101010]"
-                            >
+                            <option key={device.id} value={device.id} className="bg-[#101010]">
                               {device.name}
                             </option>
                           ))}
@@ -452,15 +425,11 @@ export const SettingsModal = ({
                     </div>
                     <Select
                       id="midiNoteMatchMode"
-                      value={normalizeMidiNoteMatchMode(
-                        inputConfig.noteMatchMode
-                      )}
+                      value={normalizeMidiNoteMatchMode(inputConfig.noteMatchMode)}
                       onChange={(e) =>
                         setInputConfig({
                           ...inputConfig,
-                          noteMatchMode: normalizeMidiNoteMatchMode(
-                            e.target.value
-                          ),
+                          noteMatchMode: normalizeMidiNoteMatchMode(e.target.value),
                         })
                       }
                       className="py-1 w-full"
@@ -475,9 +444,7 @@ export const SettingsModal = ({
                   </div>
 
                   <div className="pl-12">
-                    <div className="text-[10px] opacity-50">
-                      Velocity set to 127
-                    </div>
+                    <div className="text-[10px] opacity-50">Velocity set to 127</div>
                   </div>
                 </>
               )}
@@ -513,9 +480,7 @@ export const SettingsModal = ({
               )}
 
               <div className="pl-12">
-                <div className="opacity-50 mb-1 text-[11px]">
-                  Global Input Mappings:
-                </div>
+                <div className="opacity-50 mb-1 text-[11px]">Global Input Mappings:</div>
                 <Button onClick={onOpenMappings} className="w-full">
                   CONFIGURE MAPPINGS
                 </Button>

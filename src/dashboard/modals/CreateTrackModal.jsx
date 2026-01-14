@@ -18,7 +18,7 @@ import {
 } from "../core/state.js";
 import { updateActiveSet } from "../core/utils.js";
 import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
-import { HELP_TEXT } from "../../shared/helpText.js";
+import { HELP_TEXT } from "../../shared/helpText.ts";
 import { useNameValidation } from "../core/hooks/useNameValidation.js";
 import { useTrackSlots } from "../core/hooks/useTrackSlots.js";
 import {

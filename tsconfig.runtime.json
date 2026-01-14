@@ -45,6 +45,8 @@
     "src/main/mainProcess/protocols.ts",
     "src/main/mainProcess/lifecycle.ts",
     "src/main/mainProcess/appSetup.ts",
+    "src/main/workspaceStarterModules.ts",
+    "src/main/workspaceStarterAssets.ts",
     "src/main/InputManager.ts"
   ]
 }
