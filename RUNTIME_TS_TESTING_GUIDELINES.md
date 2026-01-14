@@ -91,6 +91,16 @@ In this repo, the canonical boundary points include:
 
 ---
 
+### Preference: runtime code must not import from `src/` at runtime
+
+When migrating logic into the runtime TS lane, the **single runtime source of truth** is the compiled output under `dist/runtime/**`.
+
+- Runtime code should **not** use “require-from-`src` fallbacks” (e.g., “try `dist/runtime`, else `src/`”).
+- If a module is needed at runtime, it should be **compiled into** `dist/runtime/**` (via `tsconfig.runtime.json`) and imported normally from the runtime bundle.
+- This avoids duplicated implementations (`.js` + `.ts`) and keeps runtime behavior consistent with what unit tests execute.
+
+---
+
 ### How to add a new “TS island” safely (checklist)
 
 - **Define the boundary**:
@@ -204,15 +214,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 
-const { normalizeCriticalPayload } = require(path.join(
-  __dirname,
-  "..",
-  "dist",
-  "runtime",
-  "shared",
-  "validation",
-  "yourNewValidator.js"
-));
+const { normalizeCriticalPayload } = require(
+  path.join(__dirname, "..", "dist", "runtime", "shared", "validation", "yourNewValidator.js")
+);
 
 test("normalizer preserves valid payload", () => {
   const payload = { id: "x" };

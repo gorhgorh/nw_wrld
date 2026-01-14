@@ -13,8 +13,11 @@
   },
   "include": [
     "src/types/vendor.d.ts",
+    "src/shared/validation/inputConfigValidation.ts",
     "src/shared/validation/inputEventValidation.ts",
     "src/shared/validation/jsonBridgeValidation.ts",
+    "src/shared/validation/oscValidation.ts",
+    "src/shared/validation/pathSafetyValidation.ts",
     "src/shared/validation/userDataValidation.ts",
     "src/shared/validation/appStateValidation.ts",
     "src/shared/validation/sandboxValidation.ts",

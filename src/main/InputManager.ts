@@ -1,5 +1,7 @@
 import { WebMidi, type MidiInput, type NoteOnEvent } from "webmidi";
 import { UDPPort, type OscMessage, type OscError } from "osc";
+import { isValidOSCChannelAddress, isValidOSCTrackAddress } from "../shared/validation/oscValidation";
+import { normalizeInputEventPayload } from "../shared/validation/inputEventValidation";
 import type {
   InputEventPayload,
   InputStatus,
@@ -7,120 +9,28 @@ import type {
   MidiDeviceInfo,
 } from "../types/input";
 import type { InputConfig } from "../types/userData";
-const path = require("node:path");
 
-const PROJECT_ROOT = path.join(__dirname, "..", "..", "..");
-const requireRuntimeOrSrc = (
-  runtimePath: string,
-  srcPathFromSrcRoot: string
-): unknown => {
-  try {
-    return require(runtimePath);
-  } catch {}
-  return require(path.join(PROJECT_ROOT, "src", srcPathFromSrcRoot));
+const DEFAULT_INPUT_CONFIG = {
+  type: "midi",
+  deviceName: "IAC Driver Bus 1",
+  trackSelectionChannel: 2,
+  methodTriggerChannel: 1,
+  velocitySensitive: false,
+  noteMatchMode: "pitchClass",
+  port: 8000,
 };
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  Boolean(v) &&
-  typeof v === "object" &&
-  !Array.isArray(v) &&
-  Object.prototype.toString.call(v) === "[object Object]";
-
-const isInputStatusValue = (v: unknown): v is InputStatus =>
-  v === "disconnected" || v === "connecting" || v === "connected" || v === "error";
-
-const isInputStatusModule = (
-  v: unknown
-): v is {
-  DISCONNECTED: InputStatus;
-  CONNECTING: InputStatus;
-  CONNECTED: InputStatus;
-  ERROR: InputStatus;
-} =>
-  isPlainObject(v) &&
-  isInputStatusValue(v.DISCONNECTED) &&
-  isInputStatusValue(v.CONNECTING) &&
-  isInputStatusValue(v.CONNECTED) &&
-  isInputStatusValue(v.ERROR);
-
-const isDefaultConfigModule = (
-  v: unknown
-): v is { DEFAULT_INPUT_CONFIG: unknown } =>
-  isPlainObject(v) && Object.prototype.hasOwnProperty.call(v, "DEFAULT_INPUT_CONFIG");
-
-const isOscValidationModule = (
-  v: unknown
-): v is {
-  isValidOSCTrackAddress: (address: string) => boolean;
-  isValidOSCChannelAddress: (address: string) => boolean;
-} =>
-  isPlainObject(v) &&
-  typeof v.isValidOSCTrackAddress === "function" &&
-  typeof v.isValidOSCChannelAddress === "function";
-
-const isInputEventValidationModule = (
-  v: unknown
-): v is { normalizeInputEventPayload: (payload: unknown) => InputEventPayload | null } =>
-  isPlainObject(v) && typeof v.normalizeInputEventPayload === "function";
-
-const defaultConfigMod = requireRuntimeOrSrc(
-  "../shared/config/defaultConfig",
-  path.join("shared", "config", "defaultConfig")
-);
-const DEFAULT_INPUT_CONFIG =
-  (isDefaultConfigModule(defaultConfigMod) ? defaultConfigMod.DEFAULT_INPUT_CONFIG : null) ??
-  {
-    type: "midi",
-    deviceName: "IAC Driver Bus 1",
-    trackSelectionChannel: 2,
-    methodTriggerChannel: 1,
-    velocitySensitive: false,
-    noteMatchMode: "pitchClass",
-    port: 8000,
-  };
-
-const inputStatusMod = requireRuntimeOrSrc(
-  "../shared/constants/inputStatus",
-  path.join("shared", "constants", "inputStatus")
-);
 const INPUT_STATUS: {
   DISCONNECTED: InputStatus;
   CONNECTING: InputStatus;
   CONNECTED: InputStatus;
   ERROR: InputStatus;
-} = isInputStatusModule(inputStatusMod)
-  ? inputStatusMod
-  : {
-      DISCONNECTED: "disconnected",
-      CONNECTING: "connecting",
-      CONNECTED: "connected",
-      ERROR: "error",
-    };
-
-const oscValidationMod = requireRuntimeOrSrc(
-  "../shared/validation/oscValidation",
-  path.join("shared", "validation", "oscValidation")
-);
-const isValidOSCTrackAddress = isOscValidationModule(oscValidationMod)
-  ? oscValidationMod.isValidOSCTrackAddress
-  : (address: string) => {
-      const trimmed = String(address || "").trim();
-      return trimmed.startsWith("/track/") || trimmed === "/track";
-    };
-const isValidOSCChannelAddress = isOscValidationModule(oscValidationMod)
-  ? oscValidationMod.isValidOSCChannelAddress
-  : (address: string) => {
-      const trimmed = String(address || "").trim();
-      return trimmed.startsWith("/ch/") || trimmed.startsWith("/channel/");
-    };
-
-const inputEventValidationMod = requireRuntimeOrSrc(
-  "../shared/validation/inputEventValidation",
-  path.join("shared", "validation", "inputEventValidation")
-);
-const normalizeInputEventPayload = isInputEventValidationModule(inputEventValidationMod)
-  ? inputEventValidationMod.normalizeInputEventPayload
-  : () => null;
+} = {
+  DISCONNECTED: "disconnected",
+  CONNECTING: "connecting",
+  CONNECTED: "connected",
+  ERROR: "error",
+};
 
 type RuntimeMidiConfig = Omit<InputConfig, "type"> & {
   type: "midi";

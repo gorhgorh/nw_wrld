@@ -32,6 +32,16 @@ const { sanitizeJsonForBridge } = require(path.join(
   "jsonBridgeValidation.js"
 ));
 
+const { normalizeInputConfig } = require(path.join(
+  srcDir,
+  "..",
+  "dist",
+  "runtime",
+  "shared",
+  "validation",
+  "inputConfigValidation.js"
+));
+
 const {
   normalizeModuleSummaries,
   normalizeModuleWithMeta,
@@ -630,7 +640,8 @@ function registerIpcBridge() {
 
   ipcMain.handle("input:configure", async (event, payload) => {
     if (state.inputManager) {
-      await state.inputManager.initialize(payload);
+      const normalized = normalizeInputConfig(payload);
+      await state.inputManager.initialize(normalized);
     }
     return { success: true };
   });
