@@ -412,6 +412,8 @@ export const AddModuleModal = ({
                           onClick={() => handleAddToTrack(module)}
                           type="secondary"
                           icon={<FaPlus />}
+                          data-testid="add-module-to-track"
+                          data-module-name={module.id || module.name}
                           title={
                             track ? "Add to track" : "Select a track first"
                           }

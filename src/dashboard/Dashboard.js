@@ -237,6 +237,10 @@ const Dashboard = () => {
   const [sequencerCurrentStep, setSequencerCurrentStep] = useState(0);
   const [isSequencerMuted, setIsSequencerMuted] = useState(false);
   const [isProjectorReady, setIsProjectorReady] = useState(false);
+  const isSequencerPlayingRef = useRef(false);
+  useEffect(() => {
+    isSequencerPlayingRef.current = isSequencerPlaying;
+  }, [isSequencerPlaying]);
   const [workspacePath, setWorkspacePath] = useState(null);
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
   const [workspaceModalMode, setWorkspaceModalMode] = useState("initial");
@@ -308,7 +312,9 @@ const Dashboard = () => {
       return;
     }
 
-    if (sequencerEngineRef.current) {
+    const shouldKeepSequencerPlaying =
+      userDataRef.current?.config?.sequencerMode && isSequencerPlayingRef.current;
+    if (sequencerEngineRef.current && !shouldKeepSequencerPlaying) {
       sequencerEngineRef.current.stop();
       if (typeof sequencerEngineRef.current.getRunId === "function") {
         sequencerRunIdRef.current = sequencerEngineRef.current.getRunId();
@@ -1111,6 +1117,22 @@ const Dashboard = () => {
     });
     setFooterPlaybackState({});
   }, [activeTrackId]);
+
+  useEffect(() => {
+    if (!userDataRef.current?.config?.sequencerMode) return;
+    if (!isSequencerPlaying) return;
+    if (!sequencerEngineRef.current) return;
+    if (!activeTrackId) return;
+
+    const tracks = getActiveSetTracks(userDataRef.current || {}, activeSetIdRef.current);
+    const track = tracks.find((t) => t.id === activeTrackId) || null;
+    if (!track) return;
+
+    const sequencerData = getSequencerForTrack(recordingDataRef.current || {}, track.id);
+    const pattern = sequencerData.pattern || {};
+    const bpm = userDataRef.current?.config?.sequencerBpm || 120;
+    sequencerEngineRef.current.load(pattern, bpm);
+  }, [activeTrackId, isSequencerPlaying]);
 
   return (
     <div className="relative bg-[#101010] font-mono h-screen flex flex-col">

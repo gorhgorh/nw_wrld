@@ -304,12 +304,17 @@ export const TrackItem = React.memo(
           </div>
 
           <div className="flex items-center gap-6 mb-4">
-            <Button onClick={() => openRightMenu(trackIndex)} icon={<FaPlus />}>
+            <Button
+              onClick={() => openRightMenu(trackIndex)}
+              icon={<FaPlus />}
+              data-testid="track-add-module"
+            >
               MODULE
             </Button>
             <Button
               onClick={handleAddChannel}
               icon={<FaPlus />}
+              data-testid="track-add-channel"
               disabled={track.modules.length === 0}
               className={
                 track.modules.length === 0

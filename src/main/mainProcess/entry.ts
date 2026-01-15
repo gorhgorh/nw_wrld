@@ -7,7 +7,21 @@ import { registerProtocols } from "./protocols";
 import { registerSandboxIpc } from "./sandbox";
 import { state } from "./state";
 import { createWindow, registerMessagingIpc } from "./windows";
-import { registerWorkspaceSelectionIpc } from "./workspace";
+import {
+  ensureWorkspaceScaffold,
+  maybeMigrateJsonIntoProject,
+  registerWorkspaceSelectionIpc,
+} from "./workspace";
+import { isExistingDirectory } from "./pathSafety";
+
+const getTestProjectDir = (): string | null => {
+  const raw = process.env.NW_WRLD_TEST_PROJECT_DIR;
+  if (!raw || typeof raw !== "string") return null;
+  const dir = raw.trim();
+  if (!dir) return null;
+  if (!isExistingDirectory(dir)) return null;
+  return dir;
+};
 
 export function start() {
   setupApp();
@@ -18,10 +32,21 @@ export function start() {
   registerWorkspaceSelectionIpc({ createWindow });
   registerLifecycle({ createWindow });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     registerProtocols();
-    state.currentProjectDir = null;
+    const testProjectDir = getTestProjectDir();
+    if (testProjectDir) {
+      state.currentProjectDir = testProjectDir;
+      try {
+        await ensureWorkspaceScaffold(testProjectDir);
+      } catch {}
+      try {
+        maybeMigrateJsonIntoProject(testProjectDir);
+      } catch {}
+    } else {
+      state.currentProjectDir = null;
+    }
     registerActivate({ createWindow });
-    createWindow(null);
+    createWindow(testProjectDir);
   });
 }

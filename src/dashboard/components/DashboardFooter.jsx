@@ -123,6 +123,7 @@ export const DashboardFooter = ({
                 icon={isPlaying ? <FaStop /> : <FaPlay />}
                 disabled={!isProjectorReady && !isPlaying}
                 as="button"
+                data-testid="sequencer-play-toggle"
               >
                 <span className="relative inline-block">
                   {isPlaying ? "STOP" : "PLAY"}

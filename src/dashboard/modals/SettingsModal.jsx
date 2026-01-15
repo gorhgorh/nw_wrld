@@ -498,6 +498,7 @@ export const SettingsModal = ({
                 value={config.sequencerBpm ?? 120}
                 fallback={config.sequencerBpm ?? 120}
                 onCommit={(next) => updateConfig({ sequencerBpm: next })}
+                data-testid="sequencer-bpm-input"
                 step={1}
                 className="py-1 w-full"
                 style={{ width: "100%" }}

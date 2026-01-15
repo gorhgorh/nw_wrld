@@ -66,6 +66,18 @@ Two windows will open:
 
 ---
 
+## E2E Testing (Playwright)
+
+```bash
+npm run test:e2e
+```
+
+- E2E tests launch the real Electron app and control the windows via Playwright.
+- Test artifacts (screenshots/traces on failure) are written to `test-results/` (gitignored).
+- Tests can boot into an isolated project folder by setting `NW_WRLD_TEST_PROJECT_DIR`.
+
+---
+
 ## Project Folders
 
 nw_wrld uses a **project folder** model. Each project is a self-contained folder containing your modules, assets, and data.
@@ -207,7 +219,6 @@ For live performance with external hardware, you can connect MIDI controllers or
 Most DAW setups send notes on **MIDI Channel 1** unless you explicitly route or change it. nw_wrld supports both single-channel and split-channel workflows:
 
 - **Option A (simplest): Single MIDI channel**
-
   - In nw_wrld → Settings → External (MIDI/OSC) → MIDI:
     - **Method Triggers MIDI Channel**: `1`
     - **Track Select MIDI Channel**: `1`
@@ -529,6 +540,7 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 
 - [Getting Started Guide](GETTING_STARTED.md)
 - [Module Development Guide](MODULE_DEVELOPMENT.md)
+- [E2E Testing Guidelines](E2E_TESTING_GUIDELINES.md)
 - [Contributing Guide](CONTRIBUTING.md)
 
 ---

@@ -79,6 +79,8 @@ const SortableTrackItem = ({
           <button
             onClick={() => onDelete(trackIndex)}
             className="text-neutral-500 hover:text-red-500 text-[11px]"
+            data-testid="delete-track"
+            aria-label="Delete track"
           >
             <FaTrash />
           </button>

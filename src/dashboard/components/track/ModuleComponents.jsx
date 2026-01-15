@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAtom } from "jotai";
 import * as d3 from "d3";
 import { SortableWrapper } from "../../shared/SortableWrapper.jsx";
@@ -20,10 +14,7 @@ import {
 import { updateActiveSet } from "../../core/utils";
 import { TERMINAL_STYLES } from "../../core/constants.ts";
 import { getActiveSetTracks } from "../../../shared/utils/setUtils.ts";
-import {
-  getRecordingForTrack,
-  getSequencerForTrack,
-} from "../../../shared/json/recordingUtils.ts";
+import { getRecordingForTrack, getSequencerForTrack } from "../../../shared/json/recordingUtils.ts";
 import {
   resolveTrackTrigger,
   resolveChannelTrigger,
@@ -50,24 +41,14 @@ export const ModuleSelector = React.memo(
     const track = tracks[trackIndex];
     const currentInputType = inputConfig?.type || "midi";
     const globalMappings = userData.config || {};
-    const resolvedTrigger = resolveTrackTrigger(
-      track,
-      currentInputType,
-      globalMappings
-    );
+    const resolvedTrigger = resolveTrackTrigger(track, currentInputType, globalMappings);
     const resolvedNoteName = useMemo(() => {
       if (currentInputType !== "midi") return resolvedTrigger;
-      if (
-        resolvedTrigger === "" ||
-        resolvedTrigger === null ||
-        resolvedTrigger === undefined
-      ) {
+      if (resolvedTrigger === "" || resolvedTrigger === null || resolvedTrigger === undefined) {
         return resolvedTrigger;
       }
       const pc =
-        typeof resolvedTrigger === "number"
-          ? resolvedTrigger
-          : parsePitchClass(resolvedTrigger);
+        typeof resolvedTrigger === "number" ? resolvedTrigger : parsePitchClass(resolvedTrigger);
       if (pc === null) return resolvedTrigger;
       const name = pitchClassToName(pc);
       return name || String(pc);
@@ -105,10 +86,7 @@ const groupSequences = (sequences, threshold = 0.1) => {
   let currentGroup = null;
 
   sequences.forEach((seq) => {
-    if (
-      currentGroup &&
-      seq.time <= currentGroup.time + currentGroup.duration + threshold
-    ) {
+    if (currentGroup && seq.time <= currentGroup.time + currentGroup.duration + threshold) {
       // Extend the current group
       currentGroup.duration = Math.max(
         currentGroup.duration,
@@ -165,8 +143,7 @@ export const NoteSelector = React.memo(
       return new Set((workspaceModuleLoadFailures || []).filter(Boolean));
     }, [workspaceModuleLoadFailures]);
     const isWorkspaceMode = Boolean(workspacePath);
-    const isFileMissing =
-      isWorkspaceMode && moduleType && !workspaceFileSet.has(moduleType);
+    const isFileMissing = isWorkspaceMode && moduleType && !workspaceFileSet.has(moduleType);
     const isLoadFailed =
       isWorkspaceMode &&
       moduleType &&
@@ -175,8 +152,8 @@ export const NoteSelector = React.memo(
     const moduleWarningText = isFileMissing
       ? `Module "${moduleType}" was referenced by this track but "${moduleType}.js" was not found in your workspace modules folder.`
       : isLoadFailed
-      ? `Module "${moduleType}.js" exists in your workspace but failed to load. Fix the module file (syntax/runtime error) and save to retry.`
-      : null;
+        ? `Module "${moduleType}.js" exists in your workspace but failed to load. Fix the module file (syntax/runtime error) and save to retry.`
+        : null;
 
     // State to store the loaded channels data
     const [channelsData, setChannelsData] = useState(null);
@@ -193,16 +170,14 @@ export const NoteSelector = React.memo(
             });
           }
 
-          const channels = Object.keys(track.channelMappings).map(
-            (channelNumber) => {
-              const channelName = `ch${channelNumber}`;
-              return {
-                name: channelName,
-                number: parseInt(channelNumber),
-                sequences: recordingMap.get(channelName) || [],
-              };
-            }
-          );
+          const channels = Object.keys(track.channelMappings).map((channelNumber) => {
+            const channelName = `ch${channelNumber}`;
+            return {
+              name: channelName,
+              number: parseInt(channelNumber),
+              sequences: recordingMap.get(channelName) || [],
+            };
+          });
           setChannelsData(channels);
         } else {
           setChannelsData(null);
@@ -214,12 +189,7 @@ export const NoteSelector = React.memo(
 
     // Auto-prune orphaned channel method configs for this module when channels change
     useEffect(() => {
-      if (
-        !channelsData ||
-        !Array.isArray(channelsData) ||
-        channelsData.length === 0
-      )
-        return;
+      if (!channelsData || !Array.isArray(channelsData) || channelsData.length === 0) return;
       const channelNumbers = new Set(channelsData.map((c) => String(c.number)));
 
       updateActiveSet(setUserData, activeSetId, (activeSet) => {
@@ -247,9 +217,7 @@ export const NoteSelector = React.memo(
       if (!channelsData || channelsData.length === 0) return 60;
 
       const maxTime = Math.max(
-        ...channelsData.flatMap(
-          (ch) => ch.sequences?.map((seq) => seq.time + seq.duration) || [0]
-        ),
+        ...channelsData.flatMap((ch) => ch.sequences?.map((seq) => seq.time + seq.duration) || [0]),
         60
       );
 
@@ -287,94 +255,80 @@ export const NoteSelector = React.memo(
       selectedChannel.channelNumber === "constructor" &&
       selectedChannel.isConstructor === true;
 
-    const visualizeConstructor = useCallback(
-      (containerRef, trackDuration, moduleData) => {
-        const svg = d3.select(containerRef);
-        svg.selectAll("*").remove();
+    const visualizeConstructor = useCallback((containerRef, trackDuration, moduleData) => {
+      const svg = d3.select(containerRef);
+      svg.selectAll("*").remove();
 
-        const width = containerRef.parentElement.getBoundingClientRect().width;
-        const heightPerChannel = rowHeight - 1;
+      const width = containerRef.parentElement.getBoundingClientRect().width;
+      const heightPerChannel = rowHeight - 1;
 
-        const svgElement = svg
-          .attr("width", width)
-          .attr("height", heightPerChannel)
-          .append("g");
+      const svgElement = svg.attr("width", width).attr("height", heightPerChannel).append("g");
 
-        const g = svgElement.append("g");
+      const g = svgElement.append("g");
 
-        const hasMethods = moduleData.constructor.length > 0;
+      const hasMethods = moduleData.constructor.length > 0;
 
-        g.append("text")
-          .attr("x", 0)
-          .attr("y", heightPerChannel / 2)
-          .attr("dy", "0.35em")
-          .attr("fill", TERMINAL_STYLES.text)
-          .attr("fill-opacity", hasMethods ? 1 : 0.2)
-          .attr("font-size", `${heightPerChannel * 1.5}px`)
-          .attr("font-family", TERMINAL_STYLES.fontFamily)
-          .text("\u03C4");
+      g.append("text")
+        .attr("x", 0)
+        .attr("y", heightPerChannel / 2)
+        .attr("dy", "0.35em")
+        .attr("fill", TERMINAL_STYLES.text)
+        .attr("fill-opacity", hasMethods ? 1 : 0.2)
+        .attr("font-size", `${heightPerChannel * 1.5}px`)
+        .attr("font-family", TERMINAL_STYLES.fontFamily)
+        .text("\u03C4");
 
-        g.append("rect")
-          .attr("x", 0)
-          .attr("y", 0)
-          .attr("width", width)
-          .attr("height", heightPerChannel)
-          .attr("fill", "transparent");
-      },
-      []
-    );
+      g.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", width)
+        .attr("height", heightPerChannel)
+        .attr("fill", "transparent");
+    }, []);
 
-    const visualizeChannel = useCallback(
-      (channel, containerRef, trackDuration, moduleData) => {
-        const svg = d3.select(containerRef);
-        svg.selectAll("*").remove();
+    const visualizeChannel = useCallback((channel, containerRef, trackDuration, moduleData) => {
+      const svg = d3.select(containerRef);
+      svg.selectAll("*").remove();
 
-        if (!channel.sequences || channel.sequences.length === 0) {
-          return;
-        }
+      if (!channel.sequences || channel.sequences.length === 0) {
+        return;
+      }
 
-        const width = containerRef.parentElement.getBoundingClientRect().width;
-        const heightPerChannel = rowHeight - 1;
-        const x = d3.scaleLinear().domain([0, trackDuration]).range([0, width]);
+      const width = containerRef.parentElement.getBoundingClientRect().width;
+      const heightPerChannel = rowHeight - 1;
+      const x = d3.scaleLinear().domain([0, trackDuration]).range([0, width]);
 
-        const svgElement = svg
-          .attr("width", width)
-          .attr("height", heightPerChannel)
-          .append("g");
+      const svgElement = svg.attr("width", width).attr("height", heightPerChannel).append("g");
 
-        const g = svgElement.append("g");
+      const g = svgElement.append("g");
 
-        const line = d3
-          .line()
-          .x((d) => x(d.time))
-          .y(() => heightPerChannel / 2)
-          .curve(d3.curveLinear);
+      const line = d3
+        .line()
+        .x((d) => x(d.time))
+        .y(() => heightPerChannel / 2)
+        .curve(d3.curveLinear);
 
-        const groupedSequences = groupSequences(channel.sequences);
-        const channelKey = String(channel.number);
-        const hasMethods = moduleData.methods[channelKey]?.length > 0;
+      const groupedSequences = groupSequences(channel.sequences);
+      const channelKey = String(channel.number);
+      const hasMethods = moduleData.methods[channelKey]?.length > 0;
 
-        g.selectAll("path")
-          .data(groupedSequences)
-          .enter()
-          .append("path")
-          .attr("d", (d) =>
-            line([{ time: d.time }, { time: d.time + d.duration }])
-          )
-          .attr("stroke", TERMINAL_STYLES.text)
-          .attr("stroke-opacity", hasMethods ? 1 : 0.2)
-          .attr("stroke-width", heightPerChannel / 1)
-          .attr("fill", "none");
+      g.selectAll("path")
+        .data(groupedSequences)
+        .enter()
+        .append("path")
+        .attr("d", (d) => line([{ time: d.time }, { time: d.time + d.duration }]))
+        .attr("stroke", TERMINAL_STYLES.text)
+        .attr("stroke-opacity", hasMethods ? 1 : 0.2)
+        .attr("stroke-width", heightPerChannel / 1)
+        .attr("fill", "none");
 
-        g.append("rect")
-          .attr("x", 0)
-          .attr("y", 0)
-          .attr("width", width)
-          .attr("height", heightPerChannel)
-          .attr("fill", "transparent");
-      },
-      []
-    );
+      g.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", width)
+        .attr("height", heightPerChannel)
+        .attr("fill", "transparent");
+    }, []);
 
     return (
       <div className="px-12 font-mono">
@@ -395,6 +349,9 @@ export const NoteSelector = React.memo(
             {dragHandleProps && (
               <span
                 className="text-[11px] font-mono text-neutral-300 cursor-move"
+                data-testid="module-drag-handle"
+                data-module-instance-id={instanceId}
+                data-module-type={moduleType}
                 {...dragHandleProps}
               >
                 <span className="text-md text-neutral-300">{"\u2261 "}</span>
@@ -429,8 +386,8 @@ export const NoteSelector = React.memo(
                   flashingConstructors.has(`${track.id}:${instanceId}`)
                     ? "text-red-500"
                     : isConstructorSelected
-                    ? "text-neutral-300"
-                    : "text-neutral-300"
+                      ? "text-neutral-300"
+                      : "text-neutral-300"
                 }`}
                 onClick={() => toggleSelectChannel("constructor", true)}
               >
@@ -445,9 +402,7 @@ export const NoteSelector = React.memo(
               </div>
               <div className="flex-1">
                 <svg
-                  ref={(ref) =>
-                    ref && visualizeConstructor(ref, trackDuration, moduleData)
-                  }
+                  ref={(ref) => ref && visualizeConstructor(ref, trackDuration, moduleData)}
                   className="w-full"
                   style={{ height: rowHeight }}
                 ></svg>
@@ -477,8 +432,8 @@ export const NoteSelector = React.memo(
                       isFlashing
                         ? "text-red-500"
                         : isSelected
-                        ? "text-neutral-300"
-                        : "text-neutral-300"
+                          ? "text-neutral-300"
+                          : "text-neutral-300"
                     }`}
                     onClick={() => toggleSelectChannel(channel.number, false)}
                   >
@@ -513,11 +468,7 @@ export const NoteSelector = React.memo(
                         if (noteMatchMode === "exactNote") {
                           const label = String(resolvedChannelTrigger ?? "").trim();
                           return label ? (
-                            <span
-                              className={
-                                isFlashing ? "text-red-500" : "text-blue-500"
-                              }
-                            >
+                            <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
                               {label}
                             </span>
                           ) : (
@@ -531,11 +482,7 @@ export const NoteSelector = React.memo(
                             : parsePitchClass(resolvedChannelTrigger);
                         const name = pc !== null ? pitchClassToName(pc) : null;
                         return name ? (
-                          <span
-                            className={
-                              isFlashing ? "text-red-500" : "text-blue-500"
-                            }
-                          >
+                          <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
                             {name}
                           </span>
                         ) : (
@@ -543,11 +490,7 @@ export const NoteSelector = React.memo(
                         );
                       }
                       return (
-                        <span
-                          className={
-                            isFlashing ? "text-red-500" : "text-blue-500"
-                          }
-                        >
+                        <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
                           {String(resolvedChannelTrigger)}
                         </span>
                       );
@@ -555,28 +498,24 @@ export const NoteSelector = React.memo(
                   </div>
                   <div className="flex-1">
                     {config?.sequencerMode ? (
-                      <div
-                        className="flex gap-0.5 items-center"
-                        style={{ height: rowHeight }}
-                      >
+                      <div className="flex gap-0.5 items-center" style={{ height: rowHeight }}>
                         {Array.from({ length: 16 }).map((_, stepIndex) => {
                           const channelKey = String(channel.number);
-                          const sequencerData = getSequencerForTrack(
-                            recordingData,
-                            track.id
-                          );
-                          const channelPattern =
-                            sequencerData.pattern?.[channelKey] || [];
+                          const sequencerData = getSequencerForTrack(recordingData, track.id);
+                          const channelPattern = sequencerData.pattern?.[channelKey] || [];
                           const isActive =
-                            Array.isArray(channelPattern) &&
-                            channelPattern.includes(stepIndex);
+                            Array.isArray(channelPattern) && channelPattern.includes(stepIndex);
                           const isCurrentStep =
-                            isSequencerPlaying &&
-                            sequencerCurrentStep === stepIndex;
+                            isSequencerPlaying && sequencerCurrentStep === stepIndex;
 
                           return (
                             <button
                               key={stepIndex}
+                              type="button"
+                              data-testid="sequencer-step"
+                              data-channel-number={channel.number}
+                              data-step-index={stepIndex}
+                              aria-pressed={isActive}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleSequencerToggle(channelKey, stepIndex);
@@ -588,16 +527,12 @@ export const NoteSelector = React.memo(
                                     ? "bg-[#b85c5c] border-[#b85c5c]"
                                     : "bg-[#1a1a1a] border-neutral-700 hover:border-neutral-500"
                                 }
-                                ${
-                                  isCurrentStep ? "ring-2 ring-neutral-400" : ""
-                                }
+                                ${isCurrentStep ? "ring-2 ring-neutral-400" : ""}
                               `}
                               style={{
                                 opacity: isActive && !hasMethods ? 0.2 : 1,
                               }}
-                              title={`Channel ${channel.number} - Step ${
-                                stepIndex + 1
-                              }`}
+                              title={`Channel ${channel.number} - Step ${stepIndex + 1}`}
                             />
                           );
                         })}
@@ -605,13 +540,7 @@ export const NoteSelector = React.memo(
                     ) : (
                       <svg
                         ref={(ref) =>
-                          ref &&
-                          visualizeChannel(
-                            channel,
-                            ref,
-                            trackDuration,
-                            moduleData
-                          )
+                          ref && visualizeChannel(channel, ref, trackDuration, moduleData)
                         }
                         className="w-full"
                         style={{ height: rowHeight }}

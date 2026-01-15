@@ -56,6 +56,9 @@ const SortableSetItem = ({
             onClick={() => onDelete(set.id)}
             className="text-neutral-500 hover:text-red-500 text-[11px]"
             disabled={!canDelete}
+            data-testid="delete-set"
+            data-set-id={set.id}
+            aria-label="Delete set"
           >
             <FaTrash />
           </button>
