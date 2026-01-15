@@ -1,7 +1,7 @@
 import React from "react";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
-import { Button } from "../components/Button.js";
+import { ModalHeader } from "../components/ModalHeader";
+import { Button } from "../components/Button";
 import {
   Select,
   NumberInput,
@@ -9,7 +9,7 @@ import {
   ColorInput,
   TextInput,
 } from "../components/FormInputs.js";
-import { HelpIcon } from "../components/HelpIcon.js";
+import { HelpIcon } from "../components/HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const isValidHexColor = (value) => /^#([0-9A-F]{3}){1,2}$/i.test(value);

@@ -1,32 +1,30 @@
-// state.js - Jotai atoms and custom hooks for state management
-
 import { atom, useAtom } from "jotai";
 import { useRef, useCallback, useEffect } from "react";
 
-// =========================
-// Jotai Atoms
-// =========================
+export const userDataAtom = atom<{ config: Record<string, unknown>; sets: unknown[] }>({
+  config: {},
+  sets: [],
+});
+export const recordingDataAtom = atom<Record<string, unknown>>({});
+export const activeTrackIdAtom = atom<string | null>(null);
+export const activeSetIdAtom = atom<string | null>(null);
+export const selectedChannelAtom = atom<unknown>(null);
+export const flashingChannelsAtom = atom<Set<string>>(new Set());
+export const flashingConstructorsAtom = atom<Set<string>>(new Set());
+export const recordingStateAtom = atom<Record<string, { startTime: number; isRecording: boolean }>>(
+  {}
+);
+export const helpTextAtom = atom<string>("");
 
-export const userDataAtom = atom({ config: {}, sets: [] });
-export const recordingDataAtom = atom({});
-export const activeTrackIdAtom = atom(null);
-export const activeSetIdAtom = atom(null);
-export const selectedChannelAtom = atom(null);
-export const flashingChannelsAtom = atom(new Set());
-export const flashingConstructorsAtom = atom(new Set());
-export const recordingStateAtom = atom({});
-export const helpTextAtom = atom("");
-
-// =========================
-// Custom Hooks
-// =========================
-
-export const useFlashingChannels = () => {
+export const useFlashingChannels = (): [
+  Set<string>,
+  (channelName: string, duration?: number) => void,
+] => {
   const [flashingChannels, setFlashingChannels] = useAtom(flashingChannelsAtom);
-  const activeFlashesRef = useRef(new Set());
-  const pendingUpdatesRef = useRef(new Set());
-  const rafIdRef = useRef(null);
-  const timeoutsRef = useRef(new Map());
+  const activeFlashesRef = useRef<Set<string>>(new Set());
+  const pendingUpdatesRef = useRef<Set<string>>(new Set());
+  const rafIdRef = useRef<number | null>(null);
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const scheduleUpdate = useCallback(() => {
     if (rafIdRef.current !== null) return;
@@ -43,7 +41,7 @@ export const useFlashingChannels = () => {
   }, [setFlashingChannels]);
 
   const flashChannel = useCallback(
-    (channelName, duration = 100) => {
+    (channelName: string, duration = 100) => {
       const isAlreadyFlashing = activeFlashesRef.current.has(channelName);
 
       const existingTimeout = timeoutsRef.current.get(channelName);

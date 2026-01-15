@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
-import { ModalFooter } from "../components/ModalFooter.js";
-import { Button } from "../components/Button.js";
+import { ModalHeader } from "../components/ModalHeader";
+import { ModalFooter } from "../components/ModalFooter";
+import { Button } from "../components/Button";
 import { Select, Label } from "../components/FormInputs.js";
-import { HelpIcon } from "../components/HelpIcon.js";
-import { userDataAtom, activeSetIdAtom } from "../core/state.js";
+import { HelpIcon } from "../components/HelpIcon";
+import { userDataAtom, activeSetIdAtom } from "../core/state.ts";
 import { updateActiveSet, updateUserData } from "../core/utils";
 import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
 import { HELP_TEXT } from "../../shared/helpText.ts";

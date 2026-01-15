@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
+import { ModalHeader } from "../components/ModalHeader";
 import { TextInput, RadioButton, Select } from "../components/FormInputs.js";
-import { userDataAtom } from "../core/state.js";
+import { userDataAtom } from "../core/state.ts";
 import { updateUserData } from "../core/utils";
 import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig.ts";
 import { parsePitchClass, pitchClassToName } from "../../shared/midi/midiUtils.ts";

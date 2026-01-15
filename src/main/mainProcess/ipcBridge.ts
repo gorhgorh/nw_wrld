@@ -386,7 +386,12 @@ export function registerIpcBridge(): void {
 
   ipcMain.on("bridge:app:getBaseMethodNames", (event) => {
     try {
-      const moduleBasePath = path.join(srcDir, "projector", "helpers", "moduleBase.js");
+      const moduleBasePath = path.join(
+        srcDir,
+        "projector",
+        "helpers",
+        "moduleBase.ts"
+      );
       const threeBasePath = path.join(srcDir, "projector", "helpers", "threeBase.js");
       const moduleBaseContent = fs.readFileSync(moduleBasePath, "utf-8");
       const threeBaseContent = fs.readFileSync(threeBasePath, "utf-8");
@@ -493,7 +498,12 @@ export function registerIpcBridge(): void {
       const safeMethodName = normalized.methodName;
       const methodNameEscaped = escapeRegExpLiteral(safeMethodName);
 
-      const moduleBasePath = path.join(srcDir, "projector", "helpers", "moduleBase.js");
+      const moduleBasePath = path.join(
+        srcDir,
+        "projector",
+        "helpers",
+        "moduleBase.ts"
+      );
       const threeBasePath = path.join(srcDir, "projector", "helpers", "threeBase.js");
 
       let filePath: string | null = null;

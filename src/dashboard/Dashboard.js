@@ -24,9 +24,9 @@ import MidiPlayback from "../shared/midi/midiPlayback.ts";
 import SequencerPlayback from "../shared/sequencer/SequencerPlayback";
 import SequencerAudio from "../shared/audio/sequencerAudio";
 import { getActiveSetTracks } from "../shared/utils/setUtils.ts";
-import { Button } from "./components/Button.js";
-import { ModalHeader } from "./components/ModalHeader.js";
-import { ModalFooter } from "./components/ModalFooter.js";
+import { Button } from "./components/Button";
+import { ModalHeader } from "./components/ModalHeader";
+import { ModalFooter } from "./components/ModalFooter";
 import { ModuleEditorModal } from "./components/ModuleEditorModal.js";
 import { NewModuleDialog } from "./components/NewModuleDialog.js";
 import {
@@ -47,7 +47,7 @@ import {
   flashingConstructorsAtom,
   recordingStateAtom,
   useFlashingChannels,
-} from "./core/state.js";
+} from "./core/state.ts";
 import { Modal } from "./shared/Modal.jsx";
 import { ConfirmationModal } from "./modals/ConfirmationModal.jsx";
 import { DebugOverlayModal } from "./modals/DebugOverlayModal.jsx";
@@ -66,7 +66,7 @@ import { MethodConfiguratorModal } from "./modals/MethodConfiguratorModal.jsx";
 import { TrackItem } from "./components/track/TrackItem.jsx";
 import { DashboardHeader } from "./components/DashboardHeader.jsx";
 import { DashboardFooter } from "./components/DashboardFooter.jsx";
-import { useWorkspaceModules } from "./core/hooks/useWorkspaceModules.js";
+import { useWorkspaceModules } from "./core/hooks/useWorkspaceModules.ts";
 import { useInputEvents } from "./core/hooks/useInputEvents.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { getProjectDir } from "../shared/utils/projectDir.ts";

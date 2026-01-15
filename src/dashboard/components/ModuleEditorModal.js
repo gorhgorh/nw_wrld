@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaTimes, FaRedo } from "react-icons/fa";
-import { Button } from "./Button.js";
+import { Button } from "./Button";
 import {
   TextInput,
   NumberInput,
@@ -11,7 +11,7 @@ import {
 } from "./FormInputs.js";
 import { getBaseMethodNames } from "../utils/moduleUtils.ts";
 import { MethodBlock } from "./MethodBlock.js";
-import { HelpIcon } from "./HelpIcon.js";
+import { HelpIcon } from "./HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const getBridge = () => globalThis.nwWrldBridge;

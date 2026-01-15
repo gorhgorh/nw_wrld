@@ -3,6 +3,18 @@ import { NumberInput } from "./FormInputs.js";
 import { HelpIcon } from "./HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText.ts";
 
+type TrackChannel = string | { name: string };
+
+type SequencerGridProps = {
+  track: { channels?: TrackChannel[] } | null;
+  pattern: Record<string, number[]>;
+  bpm: number;
+  isPlaying: boolean;
+  currentStep: number;
+  onToggleStep: (channelName: string, stepIndex: number) => void;
+  onBpmChange: React.ChangeEventHandler<HTMLInputElement>;
+};
+
 export const SequencerGrid = ({
   track,
   pattern,
@@ -11,7 +23,7 @@ export const SequencerGrid = ({
   currentStep,
   onToggleStep,
   onBpmChange,
-}) => {
+}: SequencerGridProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const channels = track?.channels || [];

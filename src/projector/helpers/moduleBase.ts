@@ -1,6 +1,19 @@
 // src/ModuleBase.js
 
 export class ModuleBase {
+  elem: HTMLElement | null;
+  name: string;
+  currentX: number;
+  currentY: number;
+  currentScale: number;
+  currentOpacity: number;
+  viewportLineElem: SVGSVGElement | null;
+  rotateTimeout: ReturnType<typeof setTimeout> | null;
+  rotationInterval: number | null;
+  rotationTimeout: ReturnType<typeof setTimeout> | null;
+  currentRotation: number;
+  externalElements: Array<HTMLElement | SVGElement>;
+
   static methods = [
     {
       name: "matrix",
@@ -31,9 +44,7 @@ export class ModuleBase {
     {
       name: "scale",
       executeOnLoad: false,
-      options: [
-        { name: "scale", defaultVal: 1, type: "number", allowRandomization: true },
-      ],
+      options: [{ name: "scale", defaultVal: 1, type: "number", allowRandomization: true }],
     },
     {
       name: "randomZoom",
@@ -45,22 +56,14 @@ export class ModuleBase {
           name: "position",
           defaultVal: "random",
           type: "select",
-          values: [
-            "random",
-            "topLeft",
-            "topRight",
-            "bottomLeft",
-            "bottomRight",
-          ],
+          values: ["random", "topLeft", "topRight", "bottomLeft", "bottomRight"],
         },
       ],
     },
     {
       name: "opacity",
       executeOnLoad: false,
-      options: [
-        { name: "opacity", defaultVal: 1, type: "number", min: 0, max: 1 },
-      ],
+      options: [{ name: "opacity", defaultVal: 1, type: "number", min: 0, max: 1 }],
     },
     {
       name: "rotate",
@@ -139,7 +142,7 @@ export class ModuleBase {
     },
   ];
 
-  constructor(container) {
+  constructor(container: HTMLElement | null) {
     this.elem = container;
     this.name = this.constructor.name;
 
@@ -150,17 +153,19 @@ export class ModuleBase {
     this.currentOpacity = 1;
     this.viewportLineElem = null;
     this.rotateTimeout = null;
+    this.rotationInterval = null;
+    this.rotationTimeout = null;
     this.currentRotation = 0;
     this.externalElements = [];
 
     if (this.elem) {
       this.elem.style.visibility = "hidden";
-      this.elem.style.opacity = this.currentOpacity;
+      this.elem.style.opacity = String(this.currentOpacity);
       this.updateTransform();
     }
   }
 
-  show(options = {}) {
+  show(options: { duration?: number } = {}) {
     const { duration = 0 } = options;
     const moduleElem = this.elem;
 
@@ -191,7 +196,7 @@ export class ModuleBase {
     }
   }
 
-  hide(options = {}) {
+  hide(options: { duration?: number } = {}) {
     const { duration = 0 } = options;
     const moduleElem = this.elem;
 
@@ -228,7 +233,7 @@ export class ModuleBase {
    * @param {number} options.x - The X offset in percentage (default: 0).
    * @param {number} options.y - The Y offset in percentage (default: 0).
    */
-  offset(options = {}) {
+  offset(options: { x?: number; y?: number } = {}) {
     const { x = 0, y = 0 } = options;
     this.currentX = x;
     this.currentY = y;
@@ -240,7 +245,7 @@ export class ModuleBase {
    * @param {Object} options
    * @param {number} options.scale - The scale factor (default: 1).
    */
-  scale(options = {}) {
+  scale(options: { scale?: number } = {}) {
     const { scale = 1 } = options;
     this.currentScale = scale;
     this.updateTransform();
@@ -251,7 +256,7 @@ export class ModuleBase {
    * @param {Object} options
    * @param {number} options.value - The opacity value between 0 and 1 (default: 1).
    */
-  opacity(options = {}) {
+  opacity(options: { opacity?: number } = {}) {
     const { opacity = 1 } = options;
     const moduleElem = this.elem;
 
@@ -259,7 +264,7 @@ export class ModuleBase {
       // Clamp the opacity value between 0 and 1
       const clampedValue = Math.min(Math.max(opacity, 0), 1);
       this.currentOpacity = clampedValue;
-      moduleElem.style.opacity = this.currentOpacity;
+      moduleElem.style.opacity = String(this.currentOpacity);
     } else {
       console.warn(`Module instance does not have an 'elem' property.`);
     }
@@ -273,7 +278,7 @@ export class ModuleBase {
    * @param {number} options.speed - The rotation speed in degrees per second (default: 60).
    * @param {number} options.duration - Duration in milliseconds to rotate before stopping (default: 0, which means infinite rotation).
    */
-  rotate(options = {}) {
+  rotate(options: { direction?: string; speed?: number; duration?: number } = {}) {
     const { direction = "clockwise", speed = 1, duration = 0 } = options;
 
     if (this.rotationInterval) {
@@ -286,10 +291,10 @@ export class ModuleBase {
     // Define the rotation step based on speed (degrees per second)
     const rotationStep = directionMultiplier * (speed * 12);
 
-    let lastTimestamp = null;
+    let lastTimestamp: number | null = null;
 
     // Define the rotation function using requestAnimationFrame
-    const rotateAnimation = (timestamp) => {
+    const rotateAnimation = (timestamp: number) => {
       if (!lastTimestamp) lastTimestamp = timestamp;
       const delta = (timestamp - lastTimestamp) / 1000; // Convert to seconds
       lastTimestamp = timestamp;
@@ -357,8 +362,7 @@ export class ModuleBase {
       }
 
       // Combine all transform parts or reset to none
-      this.elem.style.transform =
-        transformParts.length > 0 ? transformParts.join(" ") : "none";
+      this.elem.style.transform = transformParts.length > 0 ? transformParts.join(" ") : "none";
     }
   }
 
@@ -370,7 +374,7 @@ export class ModuleBase {
    * @param {string} options.position - Optional fixed position ('topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'random')
    * @returns {Object} The applied transformation values
    */
-  randomZoom(options = {}) {
+  randomZoom(options: { scaleFrom?: number; scaleTo?: number; position?: string } = {}) {
     const { scaleFrom = 1, scaleTo = 2, position = "random" } = options;
 
     // Ensure numeric values and generate random scale
@@ -428,7 +432,7 @@ export class ModuleBase {
    * @param {number} options.length - Length of line as percentage of total distance (0-100, default: 100)
    * @param {number} options.opacity - Opacity of the line (0-1, default: 1)
    */
-  viewportLine(options = {}) {
+  viewportLine(options: { x?: number; y?: number; length?: number; opacity?: number } = {}) {
     const { x = 50, y = 50, length = 100, opacity = 1 } = options;
     const moduleElem = this.elem;
 
@@ -475,21 +479,12 @@ export class ModuleBase {
     const leftCenter = { x: containerLeft, y: containerCenterY };
 
     const distances = {
-      top: Math.sqrt(
-        Math.pow(targetX - topCenter.x, 2) + Math.pow(targetY - topCenter.y, 2)
-      ),
-      right: Math.sqrt(
-        Math.pow(targetX - rightCenter.x, 2) +
-          Math.pow(targetY - rightCenter.y, 2)
-      ),
+      top: Math.sqrt(Math.pow(targetX - topCenter.x, 2) + Math.pow(targetY - topCenter.y, 2)),
+      right: Math.sqrt(Math.pow(targetX - rightCenter.x, 2) + Math.pow(targetY - rightCenter.y, 2)),
       bottom: Math.sqrt(
-        Math.pow(targetX - bottomCenter.x, 2) +
-          Math.pow(targetY - bottomCenter.y, 2)
+        Math.pow(targetX - bottomCenter.x, 2) + Math.pow(targetY - bottomCenter.y, 2)
       ),
-      left: Math.sqrt(
-        Math.pow(targetX - leftCenter.x, 2) +
-          Math.pow(targetY - leftCenter.y, 2)
-      ),
+      left: Math.sqrt(Math.pow(targetX - leftCenter.x, 2) + Math.pow(targetY - leftCenter.y, 2)),
     };
 
     // Find closest side
@@ -561,8 +556,8 @@ export class ModuleBase {
 
     // Create SVG overlay
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", viewportWidth);
-    svg.setAttribute("height", viewportHeight);
+    svg.setAttribute("width", String(viewportWidth));
+    svg.setAttribute("height", String(viewportHeight));
     svg.style.position = "fixed";
     svg.style.top = "0";
     svg.style.left = "0";
@@ -577,7 +572,7 @@ export class ModuleBase {
     path.setAttribute("d", pathData);
     path.setAttribute("stroke", "#ffffff");
     path.setAttribute("stroke-width", "1");
-    path.setAttribute("stroke-opacity", clampedOpacity);
+    path.setAttribute("stroke-opacity", String(clampedOpacity));
     path.setAttribute("fill", "none");
 
     svg.appendChild(path);
@@ -587,8 +582,7 @@ export class ModuleBase {
     svg.style.visibility = moduleVisibility;
 
     // Append to body (or projector container if available)
-    const projectorContainer =
-      document.querySelector(".projector") || document.body;
+    const projectorContainer = document.querySelector(".projector") || document.body;
     projectorContainer.appendChild(svg);
 
     this.viewportLineElem = svg;
@@ -610,7 +604,7 @@ export class ModuleBase {
    * @param {Object} options
    * @param {string} options.color - The color value (hex, rgb, rgba, or named color, default: "#000000").
    */
-  background(options = {}) {
+  background(options: { color?: string } = {}) {
     const { color = "#000000" } = options;
     const moduleElem = this.elem;
 
@@ -626,7 +620,7 @@ export class ModuleBase {
    * @param {Object} options
    * @param {number} options.duration - Duration to apply inversion in milliseconds (default: 0 for permanent).
    */
-  invert(options = {}) {
+  invert(options: { duration?: number } = {}) {
     const { duration = 0 } = options;
     const moduleElem = this.elem;
 

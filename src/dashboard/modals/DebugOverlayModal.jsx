@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from "react";
-import { Button } from "../components/Button.js";
-import { HelpIcon } from "../components/HelpIcon.js";
+import { Button } from "../components/Button";
+import { HelpIcon } from "../components/HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText.ts";
 
 const renderColoredLog = (log) => {

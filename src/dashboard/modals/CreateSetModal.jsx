@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useAtom } from "jotai";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
-import { ModalFooter } from "../components/ModalFooter.js";
-import { Button } from "../components/Button.js";
+import { ModalHeader } from "../components/ModalHeader";
+import { ModalFooter } from "../components/ModalFooter";
+import { Button } from "../components/Button";
 import { TextInput, Label, ValidationError } from "../components/FormInputs.js";
 import { useNameValidation } from "../core/hooks/useNameValidation";
 import {
   userDataAtom,
   activeTrackIdAtom,
   activeSetIdAtom,
-} from "../core/state.js";
+} from "../core/state.ts";
 import { updateUserData } from "../core/utils";
 
 export const CreateSetModal = ({ isOpen, onClose, onAlert }) => {

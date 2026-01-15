@@ -1,5 +1,19 @@
 import React from "react";
 
+type ButtonStyleType = "primary" | "secondary";
+
+type ButtonOwnProps = {
+  onClick?: React.MouseEventHandler;
+  children?: React.ReactNode;
+  title?: string;
+  className?: string;
+  as?: React.ElementType;
+  type?: ButtonStyleType;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  htmlType?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
+};
+
 export const Button = ({
   onClick,
   children,
@@ -11,7 +25,7 @@ export const Button = ({
   disabled = false,
   htmlType = "button",
   ...props
-}) => {
+}: ButtonOwnProps & Record<string, unknown>) => {
   const baseClasses = "relative flex uppercase text-[11px] font-mono";
 
   const typeClasses =
@@ -21,7 +35,7 @@ export const Button = ({
     ? "opacity-30 cursor-not-allowed"
     : "cursor-pointer";
 
-  const handleClick = (e) => {
+  const handleClick: React.MouseEventHandler = (e) => {
     if (disabled) {
       e.preventDefault();
       e.stopPropagation();
@@ -42,12 +56,11 @@ export const Button = ({
       type={Component === "button" ? htmlType : undefined}
       {...props}
     >
-      {/* [ */}
       <span className="flex items-center gap-1.5">
         {icon && <span className="flex-shrink-0 opacity-75">{icon}</span>}
         {children && <span>{children}</span>}
       </span>
-      {/* ] */}
     </Component>
   );
 };
+

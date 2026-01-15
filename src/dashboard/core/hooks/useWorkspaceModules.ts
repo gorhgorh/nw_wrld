@@ -1,7 +1,40 @@
 import { useCallback, useEffect } from "react";
-import { getProjectDir } from "../../../shared/utils/projectDir.ts";
+import type { Dispatch, SetStateAction, MutableRefObject } from "react";
+import { getProjectDir } from "../../../shared/utils/projectDir";
 import { updateUserData } from "../utils";
 import { useIPCListener } from "./useIPC";
+
+type ModuleStatus = "uninspected" | "ready" | "failed";
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+type ModuleEntry = {
+  id: string;
+  name: string;
+  category: string;
+  methods: unknown[];
+  status: ModuleStatus;
+};
+
+type UseWorkspaceModulesArgs = {
+  workspacePath: string | null;
+  isWorkspaceModalOpen: boolean;
+  sendToProjector: (type: string, props: Record<string, unknown>) => void;
+  userData: unknown;
+  setUserData: (updater: (prev: unknown) => unknown) => void;
+  predefinedModules: ModuleEntry[];
+  workspaceModuleFiles: string[];
+  setPredefinedModules: Dispatch<SetStateAction<ModuleEntry[]>>;
+  setWorkspaceModuleFiles: Dispatch<SetStateAction<string[]>>;
+  setWorkspaceModuleLoadFailures: Dispatch<SetStateAction<string[]>>;
+  setIsProjectorReady: Dispatch<SetStateAction<boolean>>;
+  didMigrateWorkspaceModuleTypesRef: MutableRefObject<boolean>;
+  loadModulesRunIdRef: MutableRefObject<number>;
+};
 
 export const useWorkspaceModules = ({
   workspacePath,
@@ -17,7 +50,7 @@ export const useWorkspaceModules = ({
   setIsProjectorReady,
   didMigrateWorkspaceModuleTypesRef,
   loadModulesRunIdRef,
-}) => {
+}: UseWorkspaceModulesArgs) => {
   const loadModules = useCallback(async () => {
     const runId = ++loadModulesRunIdRef.current;
     const isStale = () => runId !== loadModulesRunIdRef.current;
@@ -26,9 +59,11 @@ export const useWorkspaceModules = ({
       const projectDirArg = getProjectDir();
       if (!projectDirArg) return;
       if (!workspacePath) return;
-      let summaries = [];
+      let summaries: unknown[] = [];
       try {
-        const bridge = globalThis.nwWrldBridge;
+        const bridge = globalThis.nwWrldBridge as unknown as {
+          workspace?: { listModuleSummaries?: () => Promise<unknown[]> };
+        };
         if (
           bridge &&
           bridge.workspace &&
@@ -43,17 +78,23 @@ export const useWorkspaceModules = ({
       }
       const safeSummaries = Array.isArray(summaries) ? summaries : [];
       const allModuleIds = safeSummaries
-        .map((s) => (s?.id ? String(s.id) : ""))
+        .map((s) => {
+          const rec = s as { id?: unknown };
+          return rec?.id ? String(rec.id) : "";
+        })
         .filter(Boolean);
-      const listable = safeSummaries.filter((s) => Boolean(s?.hasMetadata));
+      const listable = safeSummaries.filter((s) =>
+        Boolean((s as { hasMetadata?: unknown })?.hasMetadata)
+      );
       if (isStale()) return;
       setWorkspaceModuleFiles(allModuleIds);
 
       const validModules = listable
         .map((s) => {
-          const moduleId = s?.id ? String(s.id) : "";
-          const name = s?.name ? String(s.name) : "";
-          const category = s?.category ? String(s.category) : "";
+          const rec = s as { id?: unknown; name?: unknown; category?: unknown };
+          const moduleId = rec?.id ? String(rec.id) : "";
+          const name = rec?.name ? String(rec.name) : "";
+          const category = rec?.category ? String(rec.category) : "";
           if (!moduleId || !name || !category) return null;
           if (!/^[A-Za-z][A-Za-z0-9]*$/.test(moduleId)) return null;
           return {
@@ -62,9 +103,9 @@ export const useWorkspaceModules = ({
             category,
             methods: [],
             status: "uninspected",
-          };
+          } satisfies ModuleEntry;
         })
-        .filter(Boolean);
+        .filter(Boolean) as ModuleEntry[];
       if (isStale()) return;
       setPredefinedModules(validModules);
       setWorkspaceModuleLoadFailures([]);
@@ -76,7 +117,16 @@ export const useWorkspaceModules = ({
       console.error("❌ [Dashboard] Error loading modules:", error);
       alert("Failed to load modules from project folder.");
     }
-  }, [isWorkspaceModalOpen, sendToProjector, workspacePath]);
+  }, [
+    isWorkspaceModalOpen,
+    sendToProjector,
+    workspacePath,
+    setWorkspaceModuleFiles,
+    setPredefinedModules,
+    setWorkspaceModuleLoadFailures,
+    setIsProjectorReady,
+    loadModulesRunIdRef,
+  ]);
 
   useEffect(() => {
     loadModules();
@@ -89,16 +139,13 @@ export const useWorkspaceModules = ({
         return;
       }
       if (didMigrateWorkspaceModuleTypesRef.current) return;
-      if (!Array.isArray(predefinedModules) || predefinedModules.length === 0)
-        return;
+      if (!Array.isArray(predefinedModules) || predefinedModules.length === 0) return;
 
-      const workspaceFileSet = new Set(
-        (workspaceModuleFiles || []).filter(Boolean)
-      );
+      const workspaceFileSet = new Set((workspaceModuleFiles || []).filter(Boolean));
       if (workspaceFileSet.size === 0) return;
 
-      const displayNameToId = new Map();
-      const dupes = new Set();
+      const displayNameToId = new Map<string, string>();
+      const dupes = new Set<string>();
       predefinedModules.forEach((m) => {
         const displayName = m?.name ? String(m.name) : "";
         const id = m?.id ? String(m.id) : "";
@@ -117,16 +164,16 @@ export const useWorkspaceModules = ({
       }
 
       let needsChange = false;
-      const sets = userData?.sets;
-      if (Array.isArray(sets)) {
-        for (const set of sets) {
-          const tracks = set?.tracks;
-          if (!Array.isArray(tracks)) continue;
-          for (const track of tracks) {
-            const mods = track?.modules;
-            if (!Array.isArray(mods)) continue;
-            for (const inst of mods) {
-              const t = inst?.type;
+      const setsUnknown = isRecord(userData) ? userData.sets : null;
+      if (Array.isArray(setsUnknown)) {
+        for (const set of setsUnknown) {
+          const tracksUnknown = isRecord(set) ? set.tracks : null;
+          if (!Array.isArray(tracksUnknown)) continue;
+          for (const track of tracksUnknown) {
+            const modsUnknown = isRecord(track) ? track.modules : null;
+            if (!Array.isArray(modsUnknown)) continue;
+            for (const inst of modsUnknown) {
+              const t = isRecord(inst) ? inst.type : null;
               if (!t || typeof t !== "string") continue;
               if (workspaceFileSet.has(t)) continue;
               const mapped = displayNameToId.get(t);
@@ -146,18 +193,25 @@ export const useWorkspaceModules = ({
       }
 
       updateUserData(setUserData, (draft) => {
-        if (!Array.isArray(draft?.sets)) return;
-        draft.sets.forEach((set) => {
-          if (!Array.isArray(set?.tracks)) return;
-          set.tracks.forEach((track) => {
-            if (!Array.isArray(track?.modules)) return;
-            track.modules.forEach((inst) => {
-              const t = inst?.type;
+        if (!isRecord(draft)) return;
+        const sets = draft.sets;
+        if (!Array.isArray(sets)) return;
+        sets.forEach((set) => {
+          if (!isRecord(set)) return;
+          const tracks = set.tracks;
+          if (!Array.isArray(tracks)) return;
+          tracks.forEach((track) => {
+            if (!isRecord(track)) return;
+            const modules = track.modules;
+            if (!Array.isArray(modules)) return;
+            modules.forEach((inst) => {
+              if (!isRecord(inst)) return;
+              const t = inst.type;
               if (!t || typeof t !== "string") return;
               if (workspaceFileSet.has(t)) return;
               const mapped = displayNameToId.get(t);
               if (mapped && workspaceFileSet.has(mapped)) {
-                inst.type = mapped;
+                (inst as JsonRecord)["type"] = mapped;
               }
             });
           });
@@ -175,6 +229,7 @@ export const useWorkspaceModules = ({
     workspaceModuleFiles,
     userData,
     setUserData,
+    didMigrateWorkspaceModuleTypesRef,
   ]);
 
   useIPCListener(
@@ -191,19 +246,19 @@ export const useWorkspaceModules = ({
 
   useEffect(() => {
     try {
-      if (module && module.hot) {
+      if (module && (module as any).hot) {
         try {
-          module.hot.accept("../../../projector/helpers/moduleBase.js", () => {
+          (module as any).hot.accept("../../../projector/helpers/moduleBase", () => {
             loadModules();
           });
         } catch {}
         try {
-          module.hot.accept("../../../projector/helpers/threeBase.js", () => {
+          (module as any).hot.accept("../../../projector/helpers/threeBase.js", () => {
             loadModules();
           });
         } catch {}
       }
-    } catch (e) {}
+    } catch {}
   }, [loadModules]);
 
   return { loadModules };

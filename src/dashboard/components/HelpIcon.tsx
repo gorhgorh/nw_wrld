@@ -1,8 +1,12 @@
 import React from "react";
 import { FaQuestionCircle } from "react-icons/fa";
-import { Tooltip } from "./Tooltip.js";
+import { Tooltip } from "./Tooltip";
 
-export const HelpIcon = ({ helpText }) => {
+type HelpIconProps = {
+  helpText: React.ReactNode;
+};
+
+export const HelpIcon = ({ helpText }: HelpIconProps) => {
   if (helpText == null) return null;
   if (typeof helpText === "string" && helpText.trim().length === 0) return null;
 
@@ -14,3 +18,4 @@ export const HelpIcon = ({ helpText }) => {
     </Tooltip>
   );
 };
+

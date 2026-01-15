@@ -1,9 +1,17 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-export const Tooltip = ({ children, content, position = "top" }) => {
+type TooltipPosition = "top" | "bottom" | "left" | "right";
+
+type TooltipProps = {
+  children: React.ReactNode;
+  content: React.ReactNode;
+  position?: TooltipPosition;
+};
+
+export const Tooltip = ({ children, content, position = "top" }: TooltipProps) => {
   const [isVisible, setIsVisible] = useState(false);
-  const tooltipRef = useRef(null);
-  const wrapperRef = useRef(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     if (isVisible && tooltipRef.current && wrapperRef.current) {
@@ -13,7 +21,7 @@ export const Tooltip = ({ children, content, position = "top" }) => {
       const updatePosition = () => {
         let targetRect = wrapper.getBoundingClientRect();
 
-        const absolutelyPositionedChild = wrapper.querySelector(
+        const absolutelyPositionedChild = wrapper.querySelector<HTMLElement>(
           '[class*="absolute"]'
         );
         if (absolutelyPositionedChild) {
@@ -125,3 +133,4 @@ export const Tooltip = ({ children, content, position = "top" }) => {
     </span>
   );
 };
+

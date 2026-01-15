@@ -9,22 +9,22 @@ import { useAtom } from "jotai";
 import { remove } from "lodash";
 import { useIPCSend } from "../core/hooks/useIPC";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
+import { ModalHeader } from "../components/ModalHeader";
 import { SortableWrapper } from "../shared/SortableWrapper.jsx";
 import { SortableList, arrayMove } from "../shared/SortableList.jsx";
 import { horizontalListSortingStrategy } from "@dnd-kit/sortable";
-import { ModalFooter } from "../components/ModalFooter.js";
-import { Button } from "../components/Button.js";
+import { ModalFooter } from "../components/ModalFooter";
+import { Button } from "../components/Button";
 import { Select } from "../components/FormInputs.js";
-import { HelpIcon } from "../components/HelpIcon.js";
+import { HelpIcon } from "../components/HelpIcon";
 import { MethodBlock } from "../components/MethodBlock.js";
-import { Tooltip } from "../components/Tooltip.js";
+import { Tooltip } from "../components/Tooltip";
 import { FaExclamationTriangle } from "react-icons/fa";
 import {
   userDataAtom,
   selectedChannelAtom,
   activeSetIdAtom,
-} from "../core/state.js";
+} from "../core/state.ts";
 import { updateActiveSet, getMethodsByLayer } from "../core/utils";
 import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
 import { getBaseMethodNames } from "../utils/moduleUtils.ts";

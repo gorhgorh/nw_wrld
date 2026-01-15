@@ -1,6 +1,6 @@
 import React from "react";
 import { FaBars, FaCog, FaCode, FaMusic, FaTag } from "react-icons/fa";
-import { Button } from "./Button.js";
+import { Button } from "./Button";
 import { useUpdateCheck } from "../core/hooks/useUpdateCheck";
 
 export const DashboardHeader = ({

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Button } from "./Button.js";
-import { ModalHeader } from "./ModalHeader.js";
-import { ModalFooter } from "./ModalFooter.js";
+import { Button } from "./Button";
+import { ModalHeader } from "./ModalHeader";
+import { ModalFooter } from "./ModalFooter";
 import { TextInput, Select, Label } from "./FormInputs.js";
 
 const Modal = ({ isOpen, onClose, children, size = "small" }) => {

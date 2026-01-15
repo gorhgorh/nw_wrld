@@ -9,10 +9,10 @@ module.exports = (env, argv) => {
     entry: {
       dashboard: ["./src/rendererPolyfills.ts", "./src/dashboard/entry.ts"],
       projector: ["./src/rendererPolyfills.ts", "./src/projector/entry.ts"],
-      moduleSandbox: "./src/projector/moduleSandboxEntry.js",
+      moduleSandbox: "./src/projector/moduleSandboxEntry.ts",
     },
     resolve: {
-      extensions: [".js", ".jsx", ".ts", ".json"],
+      extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
     },
     output: {
       path: path.resolve(__dirname, "dist"),
@@ -28,13 +28,17 @@ module.exports = (env, argv) => {
     module: {
       rules: [
         {
-          test: /\.ts$/,
+          test: /\.(ts|tsx)$/,
           include: [path.resolve(__dirname, "src")],
           exclude: /node_modules/,
           use: {
             loader: "babel-loader",
             options: {
-              presets: ["@babel/preset-env", "@babel/preset-typescript"],
+              presets: [
+                "@babel/preset-env",
+                "@babel/preset-react",
+                ["@babel/preset-typescript", { isTSX: true, allExtensions: true }],
+              ],
             },
           },
         },

@@ -28,6 +28,7 @@
     "src/shared/validation/userDataValidation.ts",
     "src/shared/validation/appStateValidation.ts",
     "src/shared/validation/sandboxValidation.ts",
+    "src/shared/validation/sandboxModuleUtils.ts",
     "src/shared/validation/workspaceValidation.ts",
     "src/shared/json/jsonFileBase.ts",
     "src/shared/json/configUtils.ts",

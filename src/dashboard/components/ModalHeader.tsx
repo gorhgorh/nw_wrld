@@ -1,6 +1,16 @@
 import React from "react";
 import { Button } from "./Button";
 
+type ModalHeaderProps = {
+  title: React.ReactNode;
+  onClose: () => void;
+  isBottomAligned?: boolean;
+  showClose?: boolean;
+  uppercase?: boolean;
+  containerClassName?: string;
+  titleClassName?: string;
+};
+
 export const ModalHeader = ({
   title,
   onClose,
@@ -9,7 +19,7 @@ export const ModalHeader = ({
   uppercase = true,
   containerClassName = "",
   titleClassName = "",
-}) => {
+}: ModalHeaderProps) => {
   return (
     <div className="mb-4 pb-4 border-b border-neutral-800 bg-[#101010]">
       <div
@@ -35,3 +45,4 @@ export const ModalHeader = ({
 };
 
 ModalHeader.displayName = "ModalHeader";
+

@@ -1,4 +1,4 @@
-import ModuleBase from "./helpers/moduleBase.js";
+import ModuleBase from "./helpers/moduleBase";
 import BaseThreeJsModule from "./helpers/threeBase.js";
 import * as THREE from "three";
 import p5 from "p5";
@@ -10,8 +10,17 @@ import { PCDLoader } from "three/addons/loaders/PCDLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { parseNwWrldDocblockMetadata } from "../shared/nwWrldDocblock.ts";
-import { buildMethodOptions, parseMatrixOptions } from "../shared/utils/methodOptions.ts";
+import {
+  buildMethodOptions,
+  parseMatrixOptions,
+} from "../shared/utils/methodOptions.ts";
 import { createSdkHelpers } from "../shared/utils/sdkHelpers.ts";
+import {
+  buildWorkspaceImportPreamble,
+  ensureTrailingSlash,
+  getTokenFromLocationHash,
+  safeAssetRelPath,
+} from "../shared/validation/sandboxModuleUtils";
 
 if (!globalThis.THREE) globalThis.THREE = THREE;
 if (!globalThis.p5) globalThis.p5 = p5;
@@ -23,95 +32,11 @@ if (!globalThis.PCDLoader) globalThis.PCDLoader = PCDLoader;
 if (!globalThis.GLTFLoader) globalThis.GLTFLoader = GLTFLoader;
 if (!globalThis.STLLoader) globalThis.STLLoader = STLLoader;
 
-const getTokenFromLocation = () => {
-  try {
-    const hash = String(window.location.hash || "");
-    const raw = hash.startsWith("#") ? hash.slice(1) : hash;
-    const params = new URLSearchParams(raw);
-    const token = params.get("token");
-    return token ? String(token) : null;
-  } catch {
-    return null;
-  }
-};
-
-const TOKEN = getTokenFromLocation() || globalThis.__NW_WRLD_SANDBOX_TOKEN__ || null;
-
-const WORKSPACE_MODULE_ALLOWED_IMPORTS = new Set([
-  "ModuleBase",
-  "BaseThreeJsModule",
-  "assetUrl",
-  "readText",
-  "loadJson",
-  "listAssets",
-  "THREE",
-  "p5",
-  "d3",
-  "Noise",
-  "OBJLoader",
-  "PLYLoader",
-  "PCDLoader",
-  "GLTFLoader",
-  "STLLoader",
-]);
-
-const safeAssetRelPath = (relPath) => {
-  const raw = String(relPath ?? "").trim();
-  if (!raw) return null;
-  if (raw.includes(":")) return null;
-  if (raw.startsWith("/") || raw.startsWith("\\")) return null;
-  if (/^[A-Za-z]:[\\/]/.test(raw)) return null;
-  if (raw.includes("\\")) return null;
-  const parts = raw.split("/").filter(Boolean);
-  if (!parts.length) return null;
-  for (const p of parts) {
-    if (p === "." || p === "") continue;
-    if (p === "..") return null;
-  }
-  return parts.join("/");
-};
-
-const ensureTrailingSlash = (url) => {
-  const s = String(url || "");
-  return s.endsWith("/") ? s : `${s}/`;
-};
-
-const buildWorkspaceImportPreamble = (moduleId, importsList) => {
-  const requested = Array.isArray(importsList) ? importsList : [];
-  if (!requested.length) {
-    throw new Error(`[Sandbox] Workspace module "${moduleId}" missing required @nwWrld imports.`);
-  }
-  for (const token of requested) {
-    if (!WORKSPACE_MODULE_ALLOWED_IMPORTS.has(token)) {
-      throw new Error(
-        `[Sandbox] Workspace module "${moduleId}" requested unknown import "${token}".`
-      );
-    }
-  }
-
-  const sdkImports = requested.filter(
-    (t) =>
-      t === "ModuleBase" ||
-      t === "BaseThreeJsModule" ||
-      t === "assetUrl" ||
-      t === "readText" ||
-      t === "loadJson" ||
-      t === "listAssets"
-  );
-  const globalImports = requested.filter((t) => !sdkImports.includes(t));
-
-  const lines = [];
-  if (sdkImports.length) {
-    lines.push(`const { ${sdkImports.join(", ")} } = globalThis.nwWrldSdk || {};`);
-  }
-  for (const g of globalImports) {
-    lines.push(`const ${g} = globalThis.${g};`);
-  }
-  for (const token of requested) {
-    lines.push(`if (!${token}) { throw new Error("Missing required import: ${token}"); }`);
-  }
-  return `${lines.join("\n")}\n`;
-};
+const TOKEN =
+  getTokenFromLocationHash(window?.location?.hash) ||
+  (globalThis as typeof globalThis & { __NW_WRLD_SANDBOX_TOKEN__?: unknown })
+    .__NW_WRLD_SANDBOX_TOKEN__ ||
+  null;
 
 const injectWorkspaceModuleImports = (moduleId, sourceText) => {
   if (typeof parseNwWrldDocblockMetadata !== "function") {
@@ -252,7 +177,8 @@ const mergeMethodsByName = (baseMethods, declaredMethods) => {
 
 const getBaseMethodsForClass = (Cls) => {
   try {
-    if (Cls?.prototype instanceof BaseThreeJsModule) return BaseThreeJsModule.methods;
+    if (Cls?.prototype instanceof BaseThreeJsModule)
+      return BaseThreeJsModule.methods;
     if (Cls?.prototype instanceof ModuleBase) return ModuleBase.methods;
   } catch {}
   return [];
@@ -268,7 +194,8 @@ const ensureRoot = () => {
   document.body.style.height = "100%";
   const el = document.createElement("div");
   el.id = "nwWrldTrackRoot";
-  el.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;";
+  el.style.cssText =
+    "position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;";
   document.body.appendChild(el);
   trackRoot = el;
   return trackRoot;
@@ -322,7 +249,8 @@ const destroyTrack = () => {
   instancesById.clear();
   moduleClassCache.clear();
   try {
-    if (trackRoot && trackRoot.parentNode) trackRoot.parentNode.removeChild(trackRoot);
+    if (trackRoot && trackRoot.parentNode)
+      trackRoot.parentNode.removeChild(trackRoot);
   } catch {}
   trackRoot = null;
 };
@@ -406,7 +334,8 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         const constructorMethods = Array.isArray(modulesData?.[instanceId]?.constructor)
           ? modulesData[instanceId].constructor
           : [];
-        const matrixMethod = constructorMethods.find((mm) => mm?.name === "matrix") || null;
+        const matrixMethod =
+          constructorMethods.find((mm) => mm?.name === "matrix") || null;
         const matrix = parseMatrixOptions(matrixMethod?.options);
 
         const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
@@ -445,7 +374,9 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
 
         instancesById.set(instanceId, { moduleType, instances });
 
-        const nonMatrix = constructorMethods.filter((mm) => mm?.name && mm.name !== "matrix");
+        const nonMatrix = constructorMethods.filter(
+          (mm) => mm?.name && mm.name !== "matrix"
+        );
         for (const mm of nonMatrix) {
           const methodName = String(mm.name || "").trim();
           if (!methodName) continue;
@@ -496,7 +427,8 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         respond({ ok: false, error: "INVALID_INSTANCE_ID" });
         return;
       }
-      const moduleEntry = trackModules.find((m) => m && m.id === instanceId) || null;
+      const moduleEntry =
+        trackModules.find((m) => m && m.id === instanceId) || null;
       const moduleType = String(moduleEntry?.type || "").trim();
       if (!moduleType) {
         respond({ ok: false, error: "INSTANCE_NOT_IN_TRACK" });
@@ -569,7 +501,9 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
       const ModuleClass = await loadModuleClassFromSource(moduleType, sourceText);
       const callable = getCallableMethodNamesFromClass(ModuleClass);
       const baseMethods = getBaseMethodsForClass(ModuleClass);
-      const declaredMethods = Array.isArray(ModuleClass?.methods) ? ModuleClass.methods : [];
+      const declaredMethods = Array.isArray(ModuleClass?.methods)
+        ? ModuleClass.methods
+        : [];
       const methods = mergeMethodsByName(baseMethods, declaredMethods);
       respond({
         ok: true,
@@ -593,3 +527,4 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
 });
 
 postToHost({ __nwWrldSandboxReady: true, token: TOKEN });
+

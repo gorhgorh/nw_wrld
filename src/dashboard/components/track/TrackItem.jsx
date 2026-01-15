@@ -11,7 +11,7 @@ import {
   flashingConstructorsAtom,
   helpTextAtom,
   useFlashingChannels,
-} from "../../core/state.js";
+} from "../../core/state.ts";
 import { updateActiveSet } from "../../core/utils";
 import { getActiveSetTracks } from "../../../shared/utils/setUtils.ts";
 import {
@@ -19,7 +19,7 @@ import {
   setRecordingForTrack,
 } from "../../../shared/json/recordingUtils.ts";
 import MidiPlayback from "../../../shared/midi/midiPlayback.ts";
-import { Button } from "../Button.js";
+import { Button } from "../Button";
 import { TrackDataModal } from "../../modals/TrackDataModal.jsx";
 import { ModuleSelector, SortableModuleItem } from "./ModuleComponents.jsx";
 

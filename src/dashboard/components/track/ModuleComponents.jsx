@@ -16,7 +16,7 @@ import {
   flashingChannelsAtom,
   flashingConstructorsAtom,
   useFlashingChannels,
-} from "../../core/state.js";
+} from "../../core/state.ts";
 import { updateActiveSet } from "../../core/utils";
 import { TERMINAL_STYLES } from "../../core/constants.ts";
 import { getActiveSetTracks } from "../../../shared/utils/setUtils.ts";
@@ -30,10 +30,10 @@ import {
   parsePitchClass,
   pitchClassToName,
 } from "../../../shared/midi/midiUtils.ts";
-import { Button } from "../Button.js";
+import { Button } from "../Button";
 import { FaPlus } from "react-icons/fa";
 import { FaExclamationTriangle } from "react-icons/fa";
-import { Tooltip } from "../Tooltip.js";
+import { Tooltip } from "../Tooltip";
 
 export const ModuleSelector = React.memo(
   ({

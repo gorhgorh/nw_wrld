@@ -1,16 +1,10 @@
 import React from "react";
 import { Modal } from "../shared/Modal.jsx";
-import { ModalHeader } from "../components/ModalHeader.js";
-import { ModalFooter } from "../components/ModalFooter.js";
-import { Button } from "../components/Button.js";
+import { ModalHeader } from "../components/ModalHeader";
+import { ModalFooter } from "../components/ModalFooter";
+import { Button } from "../components/Button";
 
-export const ConfirmationModal = ({
-  isOpen,
-  onClose,
-  message,
-  onConfirm,
-  type = "confirm",
-}) => {
+export const ConfirmationModal = ({ isOpen, onClose, message, onConfirm, type = "confirm" }) => {
   if (!isOpen) return null;
 
   const handleConfirm = () => {
