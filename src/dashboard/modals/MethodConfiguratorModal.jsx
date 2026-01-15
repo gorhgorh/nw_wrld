@@ -653,6 +653,8 @@ export const MethodConfiguratorModal = ({
                         addMethod(e.target.value);
                         e.target.value = "";
                       }}
+                      data-testid="method-add-select"
+                      data-layer-name={layer.name}
                       className="py-1 px-2 min-w-[150px]"
                       defaultValue=""
                       disabled={layer.availableMethods.length === 0}

@@ -389,6 +389,9 @@ export const NoteSelector = React.memo(
                       ? "text-neutral-300"
                       : "text-neutral-300"
                 }`}
+                data-testid="module-channel-config"
+                data-module-instance-id={instanceId}
+                data-channel-key="constructor"
                 onClick={() => toggleSelectChannel("constructor", true)}
               >
                 <span
@@ -435,6 +438,9 @@ export const NoteSelector = React.memo(
                           ? "text-neutral-300"
                           : "text-neutral-300"
                     }`}
+                    data-testid="module-channel-config"
+                    data-module-instance-id={instanceId}
+                    data-channel-key={String(channel.number)}
                     onClick={() => toggleSelectChannel(channel.number, false)}
                   >
                     <span

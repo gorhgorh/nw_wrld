@@ -61,4 +61,3 @@ export async function getDashboardMessages(page: Page): Promise<BufferedMessage[
     return Array.isArray(msgs) ? msgs : [];
   });
 }
-

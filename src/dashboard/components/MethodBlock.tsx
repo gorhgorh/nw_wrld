@@ -1,20 +1,10 @@
-import React, {
-  useMemo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { FaCode, FaDice, FaLock, FaPlay } from "react-icons/fa";
-import {
-  TextInput,
-  NumberInput,
-  ColorInput,
-  Select,
-  Checkbox,
-} from "./FormInputs";
+import { TextInput, NumberInput, ColorInput, Select, Checkbox } from "./FormInputs";
 import { MatrixGrid } from "../shared/MatrixGrid.jsx";
-import { AssetOptionInput } from "./AssetOptionInput.jsx";
+import { AssetOptionInput as AssetOptionInputRaw } from "./AssetOptionInput.jsx";
+
+const AssetOptionInput = AssetOptionInputRaw as unknown as React.ComponentType<any>;
 
 const CUSTOM_VALUE = "__nw_wrld_custom__";
 
@@ -55,13 +45,20 @@ type MethodBlockProps = {
   moduleMethods?: ModuleMethodDef[];
   moduleName?: string | null;
   userColors?: string[];
-  dragHandleProps?: unknown;
+  dragHandleProps?: Record<string, unknown> | null;
   onRemove?: ((methodName: string) => void) | null;
   onShowCode?: ((methodName: string) => void) | null;
-  onTrigger?: ((methodName: string, options: Record<string, unknown>) => void) | null;
+  onTrigger?: ((method: MethodValue) => void) | null;
   onOptionChange?: ((methodName: string, optionName: string, value: unknown) => void) | null;
-  onToggleRandom?: ((methodName: string, optionName: string) => void) | null;
-  onRandomRangeChange?: ((methodName: string, optionName: string, range: unknown) => void) | null;
+  onToggleRandom?: ((optionName: string, optionDef?: MethodOptionDef | null) => void) | null;
+  onRandomRangeChange?:
+    | ((
+        optionName: string,
+        indexOrValues: unknown,
+        newValue: unknown,
+        optionDef?: MethodOptionDef | null
+      ) => void)
+    | null;
   onAddMissingOption?: ((methodName: string, optionName: string) => void) | null;
 };
 
@@ -72,12 +69,16 @@ const DraftNumberInput = React.memo(
     max,
     fallback,
     onCommit,
+    methodName,
+    optionName,
   }: {
     value: unknown;
     min?: number;
     max?: number;
     fallback: number;
     onCommit: (next: number) => void;
+    methodName?: string;
+    optionName?: string;
   }) => {
     const [draft, setDraft] = useState<string | null>(null);
     const [isFocused, setIsFocused] = useState(false);
@@ -93,12 +94,7 @@ const DraftNumberInput = React.memo(
       (raw) => {
         const s = String(raw);
         const isIntermediate =
-          s === "" ||
-          s === "-" ||
-          s === "." ||
-          s === "-." ||
-          s.endsWith(".") ||
-          /e[+-]?$/i.test(s);
+          s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
         if (isIntermediate) return;
         const n = Number(s);
         if (!Number.isFinite(n)) return;
@@ -111,12 +107,7 @@ const DraftNumberInput = React.memo(
       if (draft === null) return;
       const s = String(draft);
       const isIntermediate =
-        s === "" ||
-        s === "-" ||
-        s === "." ||
-        s === "-." ||
-        s.endsWith(".") ||
-        /e[+-]?$/i.test(s);
+        s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
       if (isIntermediate) {
         onCommit(fallback);
         return;
@@ -134,6 +125,9 @@ const DraftNumberInput = React.memo(
         value={displayed}
         min={min}
         max={max}
+        data-testid="method-option-input"
+        data-method-name={methodName}
+        data-option-name={optionName}
         onFocus={() => {
           skipCommitRef.current = false;
           setIsFocused(true);
@@ -219,8 +213,8 @@ export const MethodBlock = React.memo(
             typeof option.defaultVal === "number"
               ? option.defaultVal
               : typeof currentOption.value === "number"
-              ? currentOption.value
-              : 0;
+                ? currentOption.value
+                : 0;
           return (
             <DraftNumberInput
               value={currentOption.value}
@@ -228,6 +222,8 @@ export const MethodBlock = React.memo(
               max={option.max}
               fallback={fallback}
               onCommit={(next) => handleOptionChange(option.name, next)}
+              methodName={method.name}
+              optionName={option.name}
             />
           );
         } else if (option.type === "select") {
@@ -235,6 +231,9 @@ export const MethodBlock = React.memo(
             <Select
               value={currentOption.value}
               onChange={(e) => handleOptionChange(option.name, e.target.value)}
+              data-testid="method-option-select"
+              data-method-name={method.name}
+              data-option-name={option.name}
             >
               {option.values.map((val) => (
                 <option key={val} value={val} className="bg-[#101010]">
@@ -261,13 +260,15 @@ export const MethodBlock = React.memo(
               value={currentOption.value}
               onChange={(e) => handleOptionChange(option.name, e.target.value)}
               className="w-20 py-0.5"
+              data-testid="method-option-input"
+              data-method-name={method.name}
+              data-option-name={option.name}
             />
           );
         } else if (option.type === "color") {
           const values = Array.isArray(userColors) ? userColors : [];
           const isCustomOpen =
-            customColorOpenByOption[option.name] ??
-            !values.includes(currentOption.value);
+            customColorOpenByOption[option.name] ?? !values.includes(currentOption.value);
           const selectValue =
             !isCustomOpen && values.includes(currentOption.value)
               ? currentOption.value
@@ -293,6 +294,9 @@ export const MethodBlock = React.memo(
                     handleOptionChange(option.name, next);
                   }}
                   style={{ width: "120px" }}
+                  data-testid="method-option-select"
+                  data-method-name={method.name}
+                  data-option-name={option.name}
                 >
                   {values.map((hex) => (
                     <option key={hex} value={hex} className="bg-[#101010]">
@@ -314,6 +318,9 @@ export const MethodBlock = React.memo(
                     }));
                     handleOptionChange(option.name, e.target.value);
                   }}
+                  data-testid="method-option-input"
+                  data-method-name={method.name}
+                  data-option-name={option.name}
                 />
               ) : null}
             </div>
@@ -322,9 +329,7 @@ export const MethodBlock = React.memo(
           return (
             <Checkbox
               checked={currentOption.value}
-              onChange={(e) =>
-                handleOptionChange(option.name, e.target.checked)
-              }
+              onChange={(e) => handleOptionChange(option.name, e.target.checked)}
             />
           );
         } else if (option.type === "matrix") {
@@ -367,6 +372,9 @@ export const MethodBlock = React.memo(
                     handleOptionChange(option.name, next);
                   }}
                   style={{ width: "120px" }}
+                  data-testid="method-option-select"
+                  data-method-name={method.name}
+                  data-option-name={option.name}
                 >
                   {values.map((hex) => (
                     <option key={hex} value={hex} className="bg-[#101010]">
@@ -388,6 +396,9 @@ export const MethodBlock = React.memo(
                     }));
                     handleOptionChange(option.name, e.target.value);
                   }}
+                  data-testid="method-option-input"
+                  data-method-name={method.name}
+                  data-option-name={option.name}
                 />
               ) : null}
             </div>
@@ -397,9 +408,7 @@ export const MethodBlock = React.memo(
         if (isRandomized) {
           if (option.type === "select") {
             const values = Array.isArray(option.values) ? option.values : [];
-            const currentRandomValues = Array.isArray(
-              currentOption.randomValues
-            )
+            const currentRandomValues = Array.isArray(currentOption.randomValues)
               ? currentOption.randomValues
               : [];
             const randomAll =
@@ -416,25 +425,15 @@ export const MethodBlock = React.memo(
                     onChange={(e) => {
                       if (!onRandomRangeChange) return;
                       if (e.target.checked) {
-                        onRandomRangeChange(
-                          option.name,
-                          [...values],
-                          null,
-                          option
-                        );
+                        onRandomRangeChange(option.name, [...values], null, option);
                         return;
                       }
                       const fallback = values.includes(currentOption.value)
                         ? currentOption.value
                         : values.includes(option.defaultVal)
-                        ? option.defaultVal
-                        : values[0];
-                      onRandomRangeChange(
-                        option.name,
-                        [fallback],
-                        null,
-                        option
-                      );
+                          ? option.defaultVal
+                          : values[0];
+                      onRandomRangeChange(option.name, [fallback], null, option);
                     }}
                   />
                   use all values
@@ -470,12 +469,7 @@ export const MethodBlock = React.memo(
                             if (nextSet.has(val)) nextSet.delete(val);
                             else nextSet.add(val);
                             const next = values.filter((v) => nextSet.has(v));
-                            onRandomRangeChange(
-                              option.name,
-                              next,
-                              null,
-                              option
-                            );
+                            onRandomRangeChange(option.name, next, null, option);
                           }}
                         />
                         <span>{val}</span>
@@ -497,12 +491,7 @@ export const MethodBlock = React.memo(
                       value={currentOption.randomRange[0] ? "true" : "false"}
                       onChange={(e) =>
                         onRandomRangeChange &&
-                        onRandomRangeChange(
-                          option.name,
-                          0,
-                          e.target.value,
-                          option
-                        )
+                        onRandomRangeChange(option.name, 0, e.target.value, option)
                       }
                     >
                       <option value="true">True</option>
@@ -515,12 +504,7 @@ export const MethodBlock = React.memo(
                       value={currentOption.randomRange[1] ? "true" : "false"}
                       onChange={(e) =>
                         onRandomRangeChange &&
-                        onRandomRangeChange(
-                          option.name,
-                          1,
-                          e.target.value,
-                          option
-                        )
+                        onRandomRangeChange(option.name, 1, e.target.value, option)
                       }
                     >
                       <option value="true">True</option>
@@ -536,12 +520,7 @@ export const MethodBlock = React.memo(
                       value={currentOption.randomRange[0]}
                       onChange={(e) =>
                         onRandomRangeChange &&
-                        onRandomRangeChange(
-                          option.name,
-                          0,
-                          e.target.value,
-                          option
-                        )
+                        onRandomRangeChange(option.name, 0, e.target.value, option)
                       }
                     />
                   </div>
@@ -551,12 +530,7 @@ export const MethodBlock = React.memo(
                       value={currentOption.randomRange[1]}
                       onChange={(e) =>
                         onRandomRangeChange &&
-                        onRandomRangeChange(
-                          option.name,
-                          1,
-                          e.target.value,
-                          option
-                        )
+                        onRandomRangeChange(option.name, 1, e.target.value, option)
                       }
                     />
                   </div>
@@ -569,8 +543,8 @@ export const MethodBlock = React.memo(
             typeof option.defaultVal === "number"
               ? option.defaultVal
               : typeof currentOption.value === "number"
-              ? currentOption.value
-              : 0;
+                ? currentOption.value
+                : 0;
           return (
             <DraftNumberInput
               value={currentOption.value}
@@ -578,6 +552,8 @@ export const MethodBlock = React.memo(
               max={option.max}
               fallback={fallback}
               onCommit={(next) => handleOptionChange(option.name, next)}
+              methodName={method.name}
+              optionName={option.name}
             />
           );
         } else if (option.type === "select") {
@@ -585,6 +561,9 @@ export const MethodBlock = React.memo(
             <Select
               value={currentOption.value}
               onChange={(e) => handleOptionChange(option.name, e.target.value)}
+              data-testid="method-option-select"
+              data-method-name={method.name}
+              data-option-name={option.name}
             >
               {option.values.map((val) => (
                 <option key={val} value={val} className="bg-[#101010]">
@@ -611,6 +590,9 @@ export const MethodBlock = React.memo(
               value={currentOption.value}
               onChange={(e) => handleOptionChange(option.name, e.target.value)}
               className="w-20 py-0.5"
+              data-testid="method-option-input"
+              data-method-name={method.name}
+              data-option-name={option.name}
             />
           );
         } else if (option.type === "color") {
@@ -618,15 +600,16 @@ export const MethodBlock = React.memo(
             <ColorInput
               value={currentOption.value}
               onChange={(e) => handleOptionChange(option.name, e.target.value)}
+              data-testid="method-option-input"
+              data-method-name={method.name}
+              data-option-name={option.name}
             />
           );
         } else if (option.type === "boolean") {
           return (
             <Checkbox
               checked={currentOption.value}
-              onChange={(e) =>
-                handleOptionChange(option.name, e.target.checked)
-              }
+              onChange={(e) => handleOptionChange(option.name, e.target.checked)}
             />
           );
         } else if (option.type === "matrix") {
@@ -652,17 +635,13 @@ export const MethodBlock = React.memo(
           <div className="h-0 -translate-y-[17px] w-full px-2 min-w-max flex justify-between items-baseline mb-2">
             <span
               className={`px-1 mr-4 text-[11px] font-mono text-neutral-300 bg-[#101010] ${
-                mode === "dashboard" &&
-                dragHandleProps &&
-                method.name !== "matrix"
+                mode === "dashboard" && dragHandleProps && method.name !== "matrix"
                   ? "cursor-move"
                   : method.name === "matrix"
-                  ? "cursor-not-allowed"
-                  : "cursor-default"
+                    ? "cursor-not-allowed"
+                    : "cursor-default"
               }`}
-              {...(mode === "dashboard" && dragHandleProps
-                ? dragHandleProps
-                : {})}
+              {...(mode === "dashboard" && dragHandleProps ? dragHandleProps : {})}
             >
               {mode === "dashboard" && method.name !== "matrix" && (
                 <span className="text-md text-neutral-300">{"\u2261 "}</span>
@@ -717,19 +696,15 @@ export const MethodBlock = React.memo(
               methodOptions?.length === 1
                 ? "grid-cols-1"
                 : methodOptions?.length >= 2
-                ? method.name === "matrix"
-                  ? "grid-cols-[max-content_max-content]"
-                  : "grid-cols-2"
-                : "grid-cols-1"
+                  ? method.name === "matrix"
+                    ? "grid-cols-[max-content_max-content]"
+                    : "grid-cols-2"
+                  : "grid-cols-1"
             }`}
           >
             {methodOptions?.map((option) => {
-              const methodOptionValues = Array.isArray(method?.options)
-                ? method.options
-                : [];
-              const currentOption = methodOptionValues.find(
-                (o) => o.name === option.name
-              );
+              const methodOptionValues = Array.isArray(method?.options) ? method.options : [];
+              const currentOption = methodOptionValues.find((o) => o.name === option.name);
 
               if (!currentOption) {
                 if (mode === "dashboard" && onAddMissingOption) {
@@ -740,9 +715,7 @@ export const MethodBlock = React.memo(
                     >
                       <span>ERROR: Missing key "{option.name}"</span>
                       <button
-                        onClick={() =>
-                          onAddMissingOption(method.name, option.name)
-                        }
+                        onClick={() => onAddMissingOption(method.name, option.name)}
                         className="py-0.5 px-2 text-[11px] font-mono bg-white/5 text-neutral-300 border border-neutral-300 cursor-pointer whitespace-nowrap hover:bg-neutral-300 hover:text-[#101010]"
                         title="Add missing option with default value"
                       >
@@ -772,9 +745,7 @@ export const MethodBlock = React.memo(
                 onToggleRandom &&
                 (allowRandomization ||
                   option.type === "select" ||
-                  (option.type === "color" &&
-                    Array.isArray(userColors) &&
-                    userColors.length > 0));
+                  (option.type === "color" && Array.isArray(userColors) && userColors.length > 0));
 
               return (
                 <div
@@ -786,9 +757,7 @@ export const MethodBlock = React.memo(
                     {mode === "dashboard" && showDice && (
                       <FaDice
                         className={`ml-1.5 cursor-pointer text-[10px] ${
-                          isRandomized
-                            ? "text-neutral-300"
-                            : "text-neutral-300/30"
+                          isRandomized ? "text-neutral-300" : "text-neutral-300/30"
                         }`}
                         onClick={() => onToggleRandom(option.name, option)}
                         title="Toggle Randomization"
