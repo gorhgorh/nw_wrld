@@ -89,6 +89,41 @@ export class BaseThreeJsModule extends ModuleBase {
         },
       ],
     },
+    
+    {
+      name: "displacementParams",
+      executeOnLoad: true,
+      options: [
+        {
+          name: "amplitude",
+          defaultVal: 0,
+          type: "number",
+        },
+        {
+          name: "oscTime",
+          defaultVal: 1.0,
+          type: "number",
+          min: 0.01,
+          max: 10,
+        },
+        {
+          name: "x",
+          defaultVal: 1,
+          type: "number",
+        },
+        {
+          name: "y",
+          defaultVal: 1,
+          type: "number",
+        },
+        {
+          name: "z",
+          defaultVal: 1,
+          type: "number",
+        },
+      ],
+    },
+
   ];
 
   constructor(container) {
@@ -155,6 +190,19 @@ export class BaseThreeJsModule extends ModuleBase {
     this.customAnimate = null;
 
     this.randomRotateDirection = new THREE.Vector2(1, 1); // Default directions
+
+    // Initialize Displacement parameter
+    this.displacement = {
+      enabled: false,
+      amplitude: 0,
+      axisMultipliers: new THREE.Vector3(1, 1, 1),
+    };
+
+    // Local, monotonic time state used only for displacement interpolation (state B (displaced) → A)
+    this.displacementTime = {
+      t: 0,        // accumulated time
+      speed: 1.0,  // higher = faster return from B back to A
+    };
   }
 
   /**
@@ -168,6 +216,7 @@ export class BaseThreeJsModule extends ModuleBase {
     }
 
     // Add the model to the scene
+    this.model = model;        // ← ADD THIS LINE
     this.scene.add(model);
 
     // Compute bounding box, center, and size
@@ -231,6 +280,19 @@ export class BaseThreeJsModule extends ModuleBase {
     // Update camera animation if any
     this.updateCameraAnimation();
 
+    // Advance displacement-local time once per animation frame
+    this.displacementTime.t += 0.016 * this.displacementTime.speed;
+
+    // Applies geometry displacement each frame for all geometries contained in the current model.
+    if (this.model) {
+      this.model.traverse((obj) => {
+        if (obj.geometry) {
+          this.saveBaseGeometry(obj.geometry);
+          this.applyDisplacement(obj.geometry);
+        }
+      });
+    }
+
     // Update controls (for damping and autoRotate)
     this.controls.update();
 
@@ -264,6 +326,84 @@ export class BaseThreeJsModule extends ModuleBase {
    */
   setCustomAnimate(callback) {
     this.customAnimate = callback;
+  }
+
+  /**
+   * Saves the original vertex positions of a geometry.
+   * This allows displacement to be applied non-destructively and reversed.
+   * @param {THREE.BufferGeometry} geometry - Geometry whose base positions should be stored.
+   */
+  saveBaseGeometry(geometry) {
+    const pos = geometry?.attributes?.position;
+    if (!pos) return;
+
+    if (!geometry.userData.basePositions) {
+      geometry.userData.basePositions = pos.array.slice();
+    }
+  }
+    /**
+     * Math tools for applyDisplacement so that not all vertices move uniform
+     */
+    hash01(i) {
+      // deterministic 0..1 from an integer
+      const x = Math.sin(i * 127.1 + 311.7) * 43758.5453123;
+      return x - Math.floor(x);
+    }
+
+    deterministicGaussian(i) {
+      // approx gaussian by summing uniforms (deterministic)
+      // 6 uniforms -> roughly normal(0,1) after centering
+      let s = 0;
+      s += this.hash01(i * 1 + 17);
+      s += this.hash01(i * 2 + 29);
+      s += this.hash01(i * 3 + 43);
+      s += this.hash01(i * 4 + 61);
+      s += this.hash01(i * 5 + 83);
+      s += this.hash01(i * 6 + 101);
+      return (s - 3.0); // centered around 0
+    }
+
+  /**
+   * Applies displacement to a geometry based on the current displacement state.
+   * Uses saved base positions to prevent cumulative distortion.
+   * @param {THREE.BufferGeometry} geometry - Geometry to displace.
+   */
+  applyDisplacement(geometry) {
+    if (!this.displacement.enabled) return;
+
+    const pos = geometry?.attributes?.position;
+    const base = geometry?.userData?.basePositions;
+    if (!pos || !base) return;
+
+    const amp = Number(this.displacement.amplitude) || 0;
+    const v = this.displacement.vector;
+
+    // Convert time into a smooth 0..1 blend factor controlling interpolation between A and B
+    const blend =
+      (Math.sin(this.displacementTime.t) * 0.5) + 0.5;
+
+    // If amp is zero, restore exactly (same behavior as DisplaceGeometry)
+    if (!amp) {
+      pos.array.set(base);
+      pos.needsUpdate = true;
+      return;
+    }
+
+    for (let i = 0; i < pos.count; i++) {
+      const i3 = i * 3;
+
+      // per-vertex deterministic "gaussian-like" offset
+      const g = this.deterministicGaussian(i) * amp;
+
+      // replicate DisplaceGeometry’s “add same g to x,y,z” warp,
+      // but keep your vector as a directional scaler
+      // Interpolate between base (A) and displaced (B) positions using time-based blend
+      pos.array[i3]     = base[i3]     + (g * v.x) * blend;
+      pos.array[i3 + 1] = base[i3 + 1] + (g * v.y) * blend;
+      pos.array[i3 + 2] = base[i3 + 2] + (g * v.z) * blend;
+    }
+
+    pos.needsUpdate = true;
   }
 
   /**
@@ -512,6 +652,52 @@ export class BaseThreeJsModule extends ModuleBase {
         this.currentAnimation,
         this.cameraSettings.cameraSpeed
       );
+    }
+  }
+
+  /**
+   * Implements the 'displacementAmplitude' method.
+   * Controls the strength of geometry displacement.
+   * @param {Object} options - Configuration options.
+   */
+  displacementAmplitude({ amplitude = 0 } = {}) {
+    this.displacement.amplitude = amplitude;
+    this.displacement.enabled = amplitude !== 0;
+
+    // Reset displacement time when effect is disabled to avoid phase jumps
+    if (amplitude === 0 && this.displacementTime) {
+      this.displacementTime.t = 0;
+    }
+  }
+
+  /**
+   * Controls per-axis amplitude multipliers for geometry displacement.
+   * These values scale the global amplitude independently on X, Y, and Z.
+   */
+  displacementVector({ x = 1, y = 1, z = 1 } = {}) {
+    this.displacement.vector.set(x, y, z);
+  }
+
+  /**
+   * Controls global displacement amplitude, oscillation speed,
+   * and per-axis amplitude multipliers in one call.
+   */
+  displacementParams({ amplitude = 0, oscTime = 1.0, x = 1, y = 1, z = 1 } = {}) {
+    // amplitude + enable
+    this.displacement.amplitude = amplitude;
+    this.displacement.enabled = amplitude !== 0;
+
+    // direction
+    this.displacement.vector.set(x, y, z);
+
+    // oscillate speed (time factor)
+    if (this.displacementTime) {
+      this.displacementTime.speed = oscTime;
+    }
+
+    // reset time when disabled
+    if (amplitude === 0 && this.displacementTime) {
+      this.displacementTime.t = 0;
     }
   }
 
