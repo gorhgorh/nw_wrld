@@ -195,7 +195,7 @@ export class BaseThreeJsModule extends ModuleBase {
     this.displacement = {
       enabled: false,
       amplitude: 0,
-      axisMultipliers: new THREE.Vector3(1, 1, 1),
+      vector: new THREE.Vector3(1, 1, 1),
     };
 
     // Local, monotonic time state used only for displacement interpolation (state B (displaced) → A)
