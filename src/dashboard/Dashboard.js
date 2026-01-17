@@ -210,7 +210,7 @@ const Dashboard = () => {
         });
       });
     },
-    [selectedChannel, setUserData, openConfirmationModal]
+    [selectedChannel, setUserData, openConfirmationModal, activeSetId]
   );
 
   // Load settings on mount
@@ -237,7 +237,7 @@ const Dashboard = () => {
     updateUserData(setUserData, (draft) => {
       draft.config.aspectRatio = aspectRatio;
     });
-  }, [aspectRatio]);
+  }, [aspectRatio, setUserData]);
 
   useEffect(() => {
     sendToProjector("toggleAspectRatioStyle", { name: aspectRatio });
@@ -259,7 +259,7 @@ const Dashboard = () => {
     updateUserData(setUserData, (draft) => {
       draft.config.bgColor = bgColor;
     });
-  }, [bgColor]);
+  }, [bgColor, setUserData]);
 
   useEffect(() => {
     sendToProjector("setBg", { value: bgColor });
@@ -295,7 +295,7 @@ const Dashboard = () => {
       });
     }
     isInitialMountInput.current = false;
-  }, [inputConfig]);
+  }, [inputConfig, invokeIPC, setUserData]);
 
   const prevSequencerModeRef = useRef(undefined);
   useEffect(() => {
@@ -366,9 +366,7 @@ const Dashboard = () => {
     if (!track) return null;
     const trackIndex = tracks.findIndex((t) => t.id === activeTrackId);
     return { track, trackIndex };
-  }, [activeTrackId, userData]);
-
-  // NOTE: refs are declared above; keep this section focused on derived data + hooks.
+  }, [activeTrackId, userData, activeSetId]);
 
   const {
     footerPlaybackState,
@@ -505,12 +503,20 @@ const Dashboard = () => {
             }
           }
 
-          const { userColors, ...rest } = updates || {};
+          const { userColors: _userColors, ...rest } = updates || {};
           Object.assign(draft.config, hasUserColors ? rest : updates);
         })
       );
     },
-    [setUserData, userData.config, isSequencerPlaying]
+    [
+      setUserData,
+      userData.config,
+      isSequencerPlaying,
+      sequencerEngineRef,
+      sequencerRunIdRef,
+      setIsSequencerPlaying,
+      setSequencerCurrentStep,
+    ]
   );
 
   return (

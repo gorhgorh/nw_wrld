@@ -27,7 +27,7 @@ const renderColoredLog = (log: string) => {
     }
 
     if (line.startsWith("  ")) {
-      const labelMatch = line.match(/^  ([A-Za-z]+):\s*(.*)$/);
+      const labelMatch = line.match(/^ {2}([A-Za-z]+):\s*(.*)$/);
       if (labelMatch) {
         const [, label, value] = labelMatch;
         parts.push(
@@ -60,7 +60,8 @@ const renderColoredLog = (log: string) => {
               let inString = false;
               let stringChar: string | null = null;
               let currentPart = "";
-              let keyMode = true;
+              const _keyMode = true;
+              void _keyMode;
 
               for (let i = 0; i < jsonStr.length; i++) {
                 const char = jsonStr[i];
@@ -89,7 +90,8 @@ const renderColoredLog = (log: string) => {
                       </span>
                     );
                     currentPart = "";
-                    keyMode = false;
+                    const _keyMode3 = false;
+                    void _keyMode3;
                   } else {
                     currentPart += char;
                   }
@@ -109,7 +111,8 @@ const renderColoredLog = (log: string) => {
                       {char}
                     </span>
                   );
-                  keyMode = false;
+                  const _keyMode2 = false;
+                  void _keyMode2;
                 } else if ((char === "," || char === "{" || char === "}") && !inString) {
                   if (currentPart.trim()) {
                     jsonParts.push(
@@ -124,7 +127,8 @@ const renderColoredLog = (log: string) => {
                       {char}
                     </span>
                   );
-                  keyMode = char === ",";
+                  const _keyMode = char === ",";
+                  void _keyMode;
                 } else {
                   currentPart += char;
                 }
@@ -152,7 +156,7 @@ const renderColoredLog = (log: string) => {
                 </span>
               );
             }
-          } catch (e) {
+          } catch {
             parts.push(
               <span key={`value-${lineIndex}`} className="text-neutral-300">
                 {" "}

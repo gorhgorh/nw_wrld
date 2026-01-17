@@ -145,7 +145,7 @@ export const TrackItem = memo(
       [setUserData, trackIndex, track.modules, onConfirmDelete, activeSetId]
     );
 
-    const handlePlayPause = useCallback(async () => {
+    const _handlePlayPause = useCallback(async () => {
       if (!playbackEngineRef.current) {
         playbackEngineRef.current = new MidiPlayback();
 

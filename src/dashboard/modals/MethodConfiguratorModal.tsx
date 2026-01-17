@@ -1,4 +1,4 @@
-import { memo, Fragment, useState, useMemo, useCallback, useEffect, useRef, type ChangeEvent, type ReactNode } from "react";
+import { memo, Fragment, useState, useMemo, useCallback, useEffect, useRef, type ChangeEvent } from "react";
 import { useAtom } from "jotai";
 import { remove } from "lodash";
 import { useIPCSend } from "../core/hooks/useIPC";
@@ -44,7 +44,7 @@ type OptionDef = {
   values?: string[];
 };
 
-type MethodDef = {
+type _MethodDef = {
   name: string;
   options?: OptionDef[];
 };
@@ -58,7 +58,9 @@ type ModuleMethod = {
 type PredefinedModule = {
   id?: string;
   name: string;
-  methods?: ModuleMethod[];
+  category: string;
+  status?: string;
+  methods?: unknown[];
 };
 
 type SortableItemProps = {
@@ -207,7 +209,7 @@ const SortableItem = memo(
 
     return (
       <SortableWrapper id={id} disabled={method.name === "matrix"}>
-        {({ dragHandleProps, isDragging }) => (
+        {({ dragHandleProps, isDragging: _isDragging }) => (
           <>
             <div>
               <MethodBlock
@@ -297,6 +299,37 @@ export const MethodConfiguratorModal = ({
     return predefinedModules.find((m) => m.id === ch.moduleType || m.name === ch.moduleType);
   }, [predefinedModules, selectedChannel]);
 
+  const normalizedModuleMethods = useMemo(() => {
+    const methodsUnknown = module && typeof module === "object" ? (module as { methods?: unknown }).methods : null;
+    const list = Array.isArray(methodsUnknown) ? methodsUnknown : [];
+    return list
+      .map((m: unknown) => {
+        const mObj = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
+        const name = String(mObj.name || "");
+        const executeOnLoad = mObj.executeOnLoad === true;
+        const optionsUnknown = mObj.options;
+        const optionsList = Array.isArray(optionsUnknown) ? optionsUnknown : [];
+        const options: OptionDef[] = optionsList
+          .map((o: unknown) => {
+            const oObj = o && typeof o === "object" ? (o as Record<string, unknown>) : {};
+            const optName = String(oObj.name || "");
+            if (!optName) return null;
+            const values = Array.isArray(oObj.values) ? oObj.values.map((v: unknown) => String(v)) : undefined;
+            return {
+              name: optName,
+              type: String(oObj.type || ""),
+              defaultVal: oObj.defaultVal,
+              values,
+              min: typeof oObj.min === "number" ? oObj.min : undefined,
+              max: typeof oObj.max === "number" ? oObj.max : undefined,
+            };
+          })
+          .filter((o: OptionDef | null): o is OptionDef => Boolean(o));
+        return name ? ({ name, executeOnLoad, options } as ModuleMethod) : null;
+      })
+      .filter((m: ModuleMethod | null): m is ModuleMethod => Boolean(m));
+  }, [module]);
+
   const needsIntrospection =
     Boolean((selectedChannel as SelectedChannel | null)?.moduleType) &&
     Boolean(module) &&
@@ -374,7 +407,7 @@ export const MethodConfiguratorModal = ({
 
       for (const m of methodList) {
         if (!m?.name || !Array.isArray(m.options)) continue;
-        const methodDef = module.methods?.find((mm) => mm?.name === m.name);
+        const methodDef = normalizedModuleMethods.find((mm) => mm?.name === m.name);
         if (!methodDef || !Array.isArray(methodDef.options)) continue;
 
         for (const opt of m.options) {
@@ -520,7 +553,7 @@ export const MethodConfiguratorModal = ({
     });
 
     lastNormalizedKeyRef.current = key;
-  }, [isOpen, selectedChannel, module, activeSetId, setUserData]);
+  }, [isOpen, selectedChannel, module, activeSetId, setUserData, normalizedModuleMethods]);
 
   const methodConfigs = useMemo(() => {
     const ch = selectedChannel as SelectedChannel | null;
@@ -586,7 +619,7 @@ export const MethodConfiguratorModal = ({
     (methodName: string) => {
       const ch = selectedChannel as SelectedChannel | null;
       if (!ch || !module) return;
-      const method = module.methods?.find((m) => m.name === methodName);
+      const method = normalizedModuleMethods.find((m) => m.name === methodName);
       if (!method) return;
 
       const initializedMethod = {
@@ -636,7 +669,7 @@ export const MethodConfiguratorModal = ({
         }
       });
     },
-    [module, selectedChannel, setUserData, activeSetId]
+    [module, selectedChannel, setUserData, activeSetId, normalizedModuleMethods]
   );
 
   const removeMethod = useCallback(
@@ -672,7 +705,7 @@ export const MethodConfiguratorModal = ({
     (methodName: string, optionName: string) => {
       const ch = selectedChannel as SelectedChannel | null;
       if (!ch || !module) return;
-      const methodDef = module.methods?.find((m) => m.name === methodName);
+      const methodDef = normalizedModuleMethods.find((m) => m.name === methodName);
       if (!methodDef) return;
       const optionDef = methodDef.options?.find((o) => o.name === optionName);
       if (!optionDef) return;
@@ -708,7 +741,7 @@ export const MethodConfiguratorModal = ({
         }
       });
     },
-    [module, selectedChannel, setUserData, activeSetId]
+    [module, selectedChannel, setUserData, activeSetId, normalizedModuleMethods]
   );
 
   const methodLayers = useMemo(() => {
@@ -717,9 +750,8 @@ export const MethodConfiguratorModal = ({
   }, [module, moduleBase, threeBase]);
 
   const availableMethods = useMemo(() => {
-    if (!module || !module.methods) return [];
-    return module.methods.filter((m) => !methodConfigs.some((mc) => mc.name === m.name));
-  }, [methodConfigs, module]);
+    return normalizedModuleMethods.filter((m) => !methodConfigs.some((mc) => mc.name === m.name));
+  }, [methodConfigs, normalizedModuleMethods]);
 
   const methodsByLayer = useMemo(() => {
     if (!methodLayers.length) {
@@ -785,7 +817,7 @@ export const MethodConfiguratorModal = ({
         <ModalHeader title={modalTitle} onClose={onClose} />
 
         <div className="flex flex-col gap-6">
-          {methodsByLayer.map((layer, layerIndex) => {
+          {methodsByLayer.map((layer, _layerIndex) => {
             const hasMethodsOrAvailable =
               layer.configuredMethods.length > 0 || layer.availableMethods.length > 0;
 
@@ -850,12 +882,13 @@ export const MethodConfiguratorModal = ({
                         const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
                         if (!instanceData) return;
                         
-                        let methods: MethodConfig[];
                         if (ch.isConstructor) {
-                          methods = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
+                          const _methods = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
+                          void _methods;
                         } else {
                           const methodsObj = instanceData.methods as Record<string, unknown>;
-                          methods = methodsObj[channelKey] as MethodConfig[];
+                          const _methods = methodsObj[channelKey] as MethodConfig[];
+                          void _methods;
                         }
 
                         const reorderedLayer = arrayMove(
@@ -900,7 +933,7 @@ export const MethodConfiguratorModal = ({
                             handleRemoveMethod={removeMethod}
                             changeOption={changeOption}
                             addMissingOption={addMissingOption}
-                            moduleMethods={module ? module.methods || [] : []}
+                            moduleMethods={normalizedModuleMethods}
                             moduleName={module ? module.name : null}
                             userColors={userColors}
                             onShowMethodCode={handleShowMethodCode}

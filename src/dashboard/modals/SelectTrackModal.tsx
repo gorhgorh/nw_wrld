@@ -45,7 +45,7 @@ const SortableTrackItem = ({
 }: SortableTrackItemProps) => {
   return (
     <SortableWrapper id={track.id}>
-      {({ dragHandleProps, isDragging }) => (
+      {({ dragHandleProps, isDragging: _isDragging }) => (
         <div className="flex items-center gap-3 py-2">
           <span className="text-neutral-300 cursor-move text-md" {...dragHandleProps}>
             {"\u2261"}
@@ -139,7 +139,7 @@ export const SelectTrackModal = ({
   activeTrackId,
   setActiveTrackId,
   activeSetId,
-  recordingData,
+  recordingData: _recordingData,
   setRecordingData,
   onCreateTrack,
   onConfirmDelete,
@@ -147,7 +147,7 @@ export const SelectTrackModal = ({
   const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null);
 
   const tracks = getActiveSetTracks(userData, activeSetId);
-  const activeSet = getActiveSet(userData, activeSetId);
+  const _activeSet = getActiveSet(userData, activeSetId);
   const inputType = userData?.config?.input?.type || "midi";
   const globalMappings = userData?.config || {};
 

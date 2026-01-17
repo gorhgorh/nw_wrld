@@ -16,7 +16,7 @@ const { app, BrowserWindow } = require("electron") as {
 import { state } from "./state";
 
 export function registerLifecycle({
-  createWindow,
+  createWindow: _createWindow,
 }: {
   createWindow: (projectDir: string | null) => void;
 }) {

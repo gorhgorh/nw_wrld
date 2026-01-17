@@ -10,11 +10,11 @@ type UseDashboardBootstrapArgs = {
   isInitialMountRef: { current: boolean };
   userDataLoadedSuccessfullyRef: { current: boolean };
   workspacePathRef: { current: string | null };
-  setUserData: (next: any) => void;
-  setRecordingData: (next: any) => void;
-  setActiveTrackId: (id: any) => void;
-  setActiveSetId: (id: any) => void;
-  setInputConfig: (cfg: any) => void;
+  setUserData: (next: Record<string, unknown>) => void;
+  setRecordingData: (next: Record<string, unknown>) => void;
+  setActiveTrackId: (id: string | number | null) => void;
+  setActiveSetId: (id: string | null) => void;
+  setInputConfig: (cfg: Record<string, unknown>) => void;
   setIsSequencerMuted: (next: boolean) => void;
   setWorkspacePath: (next: string | null) => void;
   setWorkspaceModalMode: (mode: "initial" | "lostSync") => void;
@@ -39,18 +39,19 @@ export const useDashboardBootstrap = ({
 }: UseDashboardBootstrapArgs) => {
   useEffect(() => {
     const initializeUserData = async () => {
-      const data = (await loadUserData()) as any;
+      const data = await loadUserData();
 
-      if (data?._loadedSuccessfully) {
+      if (data && typeof data === 'object' && '_loadedSuccessfully' in data) {
         userDataLoadedSuccessfullyRef.current = true;
       }
 
       const recordings = await loadRecordingData();
 
-      const appState = (await loadAppState()) as any;
-      const activeTrackIdToUse = appState?.activeTrackId;
-      const activeSetIdToUse = appState?.activeSetId;
-      const sequencerMutedToUse = appState?.sequencerMuted;
+      const appState = await loadAppState();
+      const appStateObj = appState && typeof appState === 'object' ? appState as Record<string, unknown> : {};
+      const activeTrackIdToUse = appStateObj.activeTrackId;
+      const activeSetIdToUse = appStateObj.activeSetId;
+      const sequencerMutedToUse = appStateObj.sequencerMuted;
       const projectDirRaw = getProjectDir();
       const workspacePathToUse =
         typeof projectDirRaw === "string" && projectDirRaw ? projectDirRaw : null;
@@ -62,10 +63,13 @@ export const useDashboardBootstrap = ({
         setWorkspaceModalPath(null);
         setIsWorkspaceModalOpen(true);
       } else {
-        const bridge = (globalThis as any).nwWrldBridge;
+        const bridge = (globalThis as { nwWrldBridge?: unknown }).nwWrldBridge;
+        const bridgeObj = bridge && typeof bridge === 'object' ? bridge as Record<string, unknown> : {};
+        const project = bridgeObj.project;
+        const projectObj = project && typeof project === 'object' ? project as Record<string, unknown> : {};
         const isAvailable =
-          bridge && bridge.project && typeof bridge.project.isDirAvailable === "function"
-            ? bridge.project.isDirAvailable()
+          typeof projectObj.isDirAvailable === "function"
+            ? (projectObj.isDirAvailable as () => boolean)()
             : false;
         if (!isAvailable) {
           setWorkspaceModalMode("lostSync");
@@ -75,26 +79,30 @@ export const useDashboardBootstrap = ({
       }
 
       if (activeSetIdToUse) {
-        setActiveSetId(activeSetIdToUse);
+        setActiveSetId(typeof activeSetIdToUse === 'string' ? activeSetIdToUse : null);
       }
 
-      setUserData(data);
+      const dataObj = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+      setUserData(dataObj);
       setRecordingData(recordings);
 
-      const cfg = data?.config || null;
-      if (cfg && cfg.input) {
-        setInputConfig(cfg.input);
+      const cfg = dataObj.config || null;
+      if (cfg && typeof cfg === 'object' && 'input' in cfg) {
+        const cfgObj = cfg as Record<string, unknown>;
+        setInputConfig(cfgObj.input && typeof cfgObj.input === 'object' ? cfgObj.input as Record<string, unknown> : {});
       }
 
       const tracks = getActiveSetTracks(data, activeSetIdToUse);
       if (tracks.length > 0) {
-        const storedTrack = activeTrackIdToUse ? tracks.find((t) => t.id === activeTrackIdToUse) : null;
+        const storedTrack = activeTrackIdToUse ? tracks.find((t: { id: unknown }) => t.id === activeTrackIdToUse) : null;
         if (storedTrack) {
-          setActiveTrackId(storedTrack.id);
+          const trackId = (storedTrack as { id: unknown }).id;
+          setActiveTrackId(typeof trackId === 'string' || typeof trackId === 'number' ? trackId : null);
         } else {
-          const visibleTrack = tracks.find((t) => t.isVisible);
+          const visibleTrack = tracks.find((t: { isVisible?: unknown }) => t.isVisible);
           const firstTrack = visibleTrack || tracks[0];
-          setActiveTrackId(firstTrack.id);
+          const trackId = (firstTrack as { id: unknown }).id;
+          setActiveTrackId(typeof trackId === 'string' || typeof trackId === 'number' ? trackId : null);
         }
       }
 
@@ -104,8 +112,9 @@ export const useDashboardBootstrap = ({
     initializeUserData();
   }, []);
 
-  useIPCListener("workspace:lostSync", (_event, payload: any) => {
-    const lostPath = payload?.workspacePath || workspacePathRef.current || null;
+  useIPCListener("workspace:lostSync", (_event, payload: unknown) => {
+    const payloadObj = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    const lostPath = typeof payloadObj.workspacePath === 'string' ? payloadObj.workspacePath : workspacePathRef.current || null;
     setWorkspaceModalMode("lostSync");
     setWorkspaceModalPath(lostPath);
     setIsWorkspaceModalOpen(true);

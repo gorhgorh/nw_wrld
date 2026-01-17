@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from "react";
+import { memo, useState, useRef, useEffect, useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from "react";
 import { Modal } from "../shared/Modal";
 import { ModalHeader } from "../components/ModalHeader";
 import { Button } from "../components/Button";
@@ -131,7 +131,7 @@ type UserColorsProps = {
 };
 
 const UserColors = ({ config, updateConfig }: UserColorsProps) => {
-  const userColors = Array.isArray(config?.userColors) ? config.userColors : [];
+  const userColors = useMemo(() => Array.isArray(config?.userColors) ? config.userColors : [], [config]);
   const [draft, setDraft] = useState(
     userColors[0] && isValidHexColor(userColors[0]) ? userColors[0] : "#ffffff"
   );

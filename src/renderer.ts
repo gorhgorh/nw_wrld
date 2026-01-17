@@ -1,4 +1,3 @@
-import Dashboard from "./dashboard/Dashboard.js";
 import Projector from "./projector/Projector.js";
 
 import "./shared/styles/_main.css";

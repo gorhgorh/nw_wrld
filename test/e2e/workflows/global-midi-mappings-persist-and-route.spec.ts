@@ -255,13 +255,19 @@ test("global MIDI mappings persist to userData.json and route input-event correc
     await clearDashboardMessages(dashboard);
 
     await dashboard.evaluate(
-      ({ deviceId, note, channel }) =>
-        (globalThis as unknown as { nwWrldBridge?: any }).nwWrldBridge?.testing?.midi?.noteOn?.({
+      ({ deviceId, note, channel }) => {
+        const bridge = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge;
+        const bridgeObj = bridge && typeof bridge === 'object' ? bridge as Record<string, unknown> : {};
+        const testing = bridgeObj.testing && typeof bridgeObj.testing === 'object' ? bridgeObj.testing as Record<string, unknown> : {};
+        const midi = testing.midi && typeof testing.midi === 'object' ? testing.midi as Record<string, unknown> : {};
+        const noteOn = typeof midi.noteOn === 'function' ? midi.noteOn as (args: unknown) => void : null;
+        noteOn?.({
           deviceId,
           note,
           channel,
           velocity: 1,
-        }),
+        });
+      },
       { deviceId: midiDeviceId, note: trackSelectNote, channel: trackSelectionChannel }
     );
 
@@ -288,13 +294,19 @@ test("global MIDI mappings persist to userData.json and route input-event correc
     await clearDashboardMessages(dashboard);
 
     await dashboard.evaluate(
-      ({ deviceId, note, channel }) =>
-        (globalThis as unknown as { nwWrldBridge?: any }).nwWrldBridge?.testing?.midi?.noteOn?.({
+      ({ deviceId, note, channel }) => {
+        const bridge = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge;
+        const bridgeObj = bridge && typeof bridge === 'object' ? bridge as Record<string, unknown> : {};
+        const testing = bridgeObj.testing && typeof bridgeObj.testing === 'object' ? bridgeObj.testing as Record<string, unknown> : {};
+        const midi = testing.midi && typeof testing.midi === 'object' ? testing.midi as Record<string, unknown> : {};
+        const noteOn = typeof midi.noteOn === 'function' ? midi.noteOn as (args: unknown) => void : null;
+        noteOn?.({
           deviceId,
           note,
           channel,
           velocity: 1,
-        }),
+        });
+      },
       { deviceId: midiDeviceId, note: channelTriggerNote, channel: methodTriggerChannel }
     );
 

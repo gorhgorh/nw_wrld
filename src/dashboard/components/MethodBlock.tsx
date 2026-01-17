@@ -1,5 +1,5 @@
 import { memo, useMemo, useCallback, useEffect, useRef, useState } from "react";
-import { FaCode, FaDice, FaLock, FaPlay } from "react-icons/fa";
+import { FaDice, FaLock, FaPlay } from "react-icons/fa";
 import { TextInput, NumberInput, ColorInput, Select, Checkbox } from "./FormInputs";
 import { MatrixGrid } from "../shared/MatrixGrid";
 import { AssetOptionInput } from "./AssetOptionInput";
@@ -162,11 +162,11 @@ export const MethodBlock = memo(
     method,
     mode = "dashboard",
     moduleMethods = [],
-    moduleName = null,
+    moduleName: _moduleName = null,
     userColors = [],
     dragHandleProps = null,
     onRemove = null,
-    onShowCode = null,
+    onShowCode: _onShowCode = null,
     onTrigger = null,
     onOptionChange = null,
     onToggleRandom = null,
@@ -203,7 +203,7 @@ export const MethodBlock = memo(
       const optionDef = moduleMethods
         .find((m) => m.name === method.name)
         ?.options.find((o) => o.name === option.name);
-      const allowRandomization = optionDef?.allowRandomization || false;
+      const _allowRandomization = optionDef?.allowRandomization || false;
 
       if (mode === "editor") {
         if (option.type === "number") {

@@ -14,7 +14,7 @@ type MethodDefinition = {
   options?: unknown;
 };
 
-type MethodOptionValue = {
+type _MethodOptionValue = {
   name?: unknown;
   value?: unknown;
   randomRange?: unknown;

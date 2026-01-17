@@ -7,16 +7,16 @@ import { saveUserData, saveUserDataSync } from "../utils";
 type UseDashboardPersistenceArgs = {
   isInitialMountRef: { current: boolean };
   userDataLoadedSuccessfullyRef: { current: boolean };
-  userData: any;
-  recordingData: any;
-  activeTrackId: any;
-  activeSetId: any;
-  userDataRef: { current: any };
-  recordingDataRef: { current: any };
-  activeTrackIdRef: { current: any };
-  activeSetIdRef: { current: any };
-  workspacePathRef: { current: any };
-  sequencerMutedRef: { current: any };
+  userData: Record<string, unknown>;
+  recordingData: Record<string, unknown>;
+  activeTrackId: string | number | null;
+  activeSetId: string | null;
+  userDataRef: { current: Record<string, unknown> };
+  recordingDataRef: { current: Record<string, unknown> };
+  activeTrackIdRef: { current: string | number | null };
+  activeSetIdRef: { current: string | null };
+  workspacePathRef: { current: string | null };
+  sequencerMutedRef: { current: boolean };
   sendToProjector: (type: string, props: Record<string, unknown>) => void;
   isSequencerMuted: boolean;
 };
@@ -54,11 +54,12 @@ export const useDashboardPersistence = ({
       userDataSaveTimeoutRef.current = null;
 
       const tracks = getActiveSetTracks(userData, activeSetId);
-      const track = tracks.find((t) => t.id === activeTrackId);
+      const track = tracks.find((t: { id: unknown }) => t.id === activeTrackId);
+      const trackObj = track && typeof track === 'object' ? track as Record<string, unknown> : {};
 
       sendToProjector("reload-data", {
         setId: activeSetId,
-        trackName: track?.name || null,
+        trackName: trackObj.name || null,
       });
     }, 500);
     userDataSaveTimeoutRef.current = debouncedSave;
@@ -128,9 +129,10 @@ export const useDashboardPersistence = ({
 
     const updateAppState = async () => {
       const currentState = await loadAppState();
-      const preservedWorkspacePath = workspacePathRef.current ?? (currentState as any).workspacePath ?? null;
+      const currentStateObj = currentState && typeof currentState === 'object' ? currentState as Record<string, unknown> : {};
+      const preservedWorkspacePath = workspacePathRef.current ?? currentStateObj.workspacePath ?? null;
       const stateToSave = {
-        ...(currentState as any),
+        ...currentStateObj,
         activeTrackId,
         activeSetId,
         sequencerMuted: isSequencerMuted,

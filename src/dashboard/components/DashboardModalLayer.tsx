@@ -15,6 +15,10 @@ import { NewModuleDialog } from "./NewModuleDialog";
 
 type Confirmation = { message: string; onConfirm?: () => void; type?: "confirm" | "alert" } | null;
 
+type UserData = Parameters<typeof SelectSetModal>[0]["userData"];
+type ProjectorSettings = Parameters<typeof SettingsModal>[0]["settings"];
+type PredefinedModules = Parameters<typeof AddModuleModal>[0]["predefinedModules"];
+
 type DashboardModalLayerProps = {
   isCreateTrackOpen: boolean;
   setIsCreateTrackOpen: (next: boolean) => void;
@@ -37,28 +41,30 @@ type DashboardModalLayerProps = {
   isDebugOverlayOpen: boolean;
   setIsDebugOverlayOpen: (next: boolean) => void;
 
-  userData: any;
-  setUserData: any;
-  recordingData: any;
-  setRecordingData: any;
-  activeTrackId: any;
-  setActiveTrackId: any;
-  activeSetId: any;
-  setActiveSetId: any;
+  userData: UserData;
+  setUserData: (
+    updater: ((prev: Record<string, unknown>) => Record<string, unknown>) | Record<string, unknown>
+  ) => void;
+  recordingData: Record<string, unknown>;
+  setRecordingData: (updater: ((prev: Record<string, unknown>) => Record<string, unknown>) | Record<string, unknown>) => void;
+  activeTrackId: string | number | null;
+  setActiveTrackId: (id: string | number | null) => void;
+  activeSetId: string | null;
+  setActiveSetId: (id: string | null) => void;
 
-  inputConfig: any;
-  setInputConfig: any;
-  availableMidiDevices: any[];
-  settings: any;
+  inputConfig: Record<string, unknown>;
+  setInputConfig: (config: Record<string, unknown>) => void;
+  availableMidiDevices: Array<{ id: string; name: string }>;
+  settings: ProjectorSettings;
   aspectRatio: string;
   setAspectRatio: (ratio: string) => void;
   bgColor: string;
   setBgColor: (color: string) => void;
-  updateConfig: any;
+  updateConfig: (updates: Record<string, unknown>) => void;
   workspacePath: string | null;
   onSelectWorkspace: () => void;
 
-  predefinedModules: any[];
+  predefinedModules: PredefinedModules;
   selectedTrackForModuleMenu: number | null;
   setSelectedTrackForModuleMenu: (next: number | null) => void;
   onCreateNewModule: () => void;

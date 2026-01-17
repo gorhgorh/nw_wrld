@@ -50,7 +50,7 @@ export const MatrixGrid = ({ value, onChange }: MatrixGridProps) => {
     const oldRows = rows;
     setRows(numRows);
 
-    let updated = excludedCells.filter((key) => {
+    const updated = excludedCells.filter((key) => {
       const [r] = key.split("-").map(Number);
       return r <= numRows;
     });
@@ -75,7 +75,7 @@ export const MatrixGrid = ({ value, onChange }: MatrixGridProps) => {
     const oldCols = cols;
     setCols(numCols);
 
-    let updated = excludedCells.filter((key) => {
+    const updated = excludedCells.filter((key) => {
       const [, c] = key.split("-").map(Number);
       return c <= numCols;
     });

@@ -9,15 +9,15 @@ import { getRecordingForTrack, getSequencerForTrack } from "../../../shared/json
 import { useLatestRef } from "./useLatestRef";
 
 type UseDashboardPlaybackArgs = {
-  userData: any;
-  userDataRef: MutableRefObject<any>;
+  userData: Record<string, unknown>;
+  userDataRef: MutableRefObject<Record<string, unknown>>;
   activeTrackId: string | number | null;
-  activeSetId: any;
-  activeSetIdRef: MutableRefObject<any>;
-  firstVisibleTrack: { track: any; trackIndex: number } | null;
-  recordingData: any;
-  recordingDataRef: MutableRefObject<any>;
-  setRecordingData: any;
+  activeSetId: string | null;
+  activeSetIdRef: MutableRefObject<string | null>;
+  firstVisibleTrack: { track: Record<string, unknown>; trackIndex: number } | null;
+  recordingData: Record<string, unknown>;
+  recordingDataRef: MutableRefObject<Record<string, unknown>>;
+  setRecordingData: (updater: (draft: Record<string, unknown>) => void) => void;
   sendToProjector: (type: string, props: Record<string, unknown>) => void;
   flashChannel: (channelName: string, durationMs?: number) => void;
   setFlashingConstructors: (updater: (prev: Set<string>) => Set<string>) => void;
@@ -60,8 +60,10 @@ export const useDashboardPlayback = ({
       return;
     }
 
+    const userDataObj = userDataRef.current && typeof userDataRef.current === 'object' ? userDataRef.current as Record<string, unknown> : {};
+    const config = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
     const shouldKeepSequencerPlaying =
-      userDataRef.current?.config?.sequencerMode && isSequencerPlayingRef.current;
+      config.sequencerMode && isSequencerPlayingRef.current;
     if (sequencerEngineRef.current && !shouldKeepSequencerPlaying) {
       sequencerEngineRef.current.stop();
       if (typeof sequencerEngineRef.current.getRunId === "function") {
@@ -79,7 +81,8 @@ export const useDashboardPlayback = ({
     setFooterPlaybackState({});
 
     const tracks = getActiveSetTracks(userDataRef.current || {}, activeSetId);
-    const track = tracks.find((t) => t.id === activeTrackId);
+    const track = tracks.find((t: { id: unknown }) => t.id === activeTrackId);
+    const trackObj = track && typeof track === 'object' ? track as Record<string, unknown> : {};
 
     if (track) {
       setIsProjectorReady(false);
@@ -87,7 +90,7 @@ export const useDashboardPlayback = ({
         setId: activeSetId,
       });
       sendToProjector("track-activate", {
-        trackName: track.name,
+        trackName: trackObj.name,
       });
     } else {
       setIsProjectorReady(true);
@@ -98,26 +101,31 @@ export const useDashboardPlayback = ({
     (channelName: string, stepIndex: number) => {
       if (!firstVisibleTrack) return;
       const { track } = firstVisibleTrack;
+      const trackObj = track && typeof track === 'object' ? track as Record<string, unknown> : {};
 
       setRecordingData(
-        produce((draft: any) => {
-          if (!draft[track.id]) {
-            draft[track.id] = { channels: [], sequencer: { pattern: {} } };
+        produce((draft: Record<string, unknown>) => {
+          const trackId = String(trackObj.id || '');
+          if (!draft[trackId]) {
+            draft[trackId] = { channels: [], sequencer: { pattern: {} } };
           }
-          if (!draft[track.id].sequencer) {
-            draft[track.id].sequencer = { pattern: {} };
+          const draftTrack = draft[trackId] as Record<string, unknown>;
+          if (!draftTrack.sequencer) {
+            draftTrack.sequencer = { pattern: {} };
           }
-          if (!draft[track.id].sequencer.pattern) {
-            draft[track.id].sequencer.pattern = {};
+          const sequencer = draftTrack.sequencer as Record<string, unknown>;
+          if (!sequencer.pattern) {
+            sequencer.pattern = {};
           }
+          const pattern = sequencer.pattern as Record<string, unknown>;
           if (
-            !draft[track.id].sequencer.pattern[channelName] ||
-            !Array.isArray(draft[track.id].sequencer.pattern[channelName])
+            !pattern[channelName] ||
+            !Array.isArray(pattern[channelName])
           ) {
-            draft[track.id].sequencer.pattern[channelName] = [];
+            pattern[channelName] = [];
           }
 
-          const steps = draft[track.id].sequencer.pattern[channelName];
+          const steps = pattern[channelName] as number[];
           const idx = steps.indexOf(stepIndex);
 
           if (idx > -1) {
@@ -130,14 +138,16 @@ export const useDashboardPlayback = ({
       );
 
       if (sequencerEngineRef.current && isSequencerPlaying) {
-        const sequencerData = getSequencerForTrack(recordingData, track.id as any);
-        const updatedPattern = { ...(sequencerData as any).pattern };
+        const sequencerData = getSequencerForTrack(recordingData as Record<string, unknown>, String(trackObj.id || ''));
+        const sequencerDataObj = sequencerData && typeof sequencerData === 'object' ? sequencerData as Record<string, unknown> : {};
+        const patternObj = sequencerDataObj.pattern && typeof sequencerDataObj.pattern === 'object' ? sequencerDataObj.pattern as Record<string, unknown> : {};
+        const updatedPattern: Record<string, number[]> = { ...patternObj as Record<string, number[]> };
 
         if (!updatedPattern[channelName]) {
           updatedPattern[channelName] = [];
         }
 
-        const steps = [...updatedPattern[channelName]];
+        const steps = Array.isArray(updatedPattern[channelName]) ? [...updatedPattern[channelName]] : [];
         const idx = steps.indexOf(stepIndex);
 
         if (idx > -1) {
@@ -149,7 +159,9 @@ export const useDashboardPlayback = ({
 
         updatedPattern[channelName] = steps;
 
-        const bpm = userData.config.sequencerBpm || 120;
+        const userDataObj = userData && typeof userData === 'object' ? userData as Record<string, unknown> : {};
+        const userConfig = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
+        const bpm = typeof userConfig.sequencerBpm === 'number' ? userConfig.sequencerBpm : 120;
         sequencerEngineRef.current.load(updatedPattern, bpm);
       }
     },
@@ -159,8 +171,10 @@ export const useDashboardPlayback = ({
   const handleFooterPlayPause = useCallback(async () => {
     if (!firstVisibleTrack) return;
     const { track } = firstVisibleTrack;
-    const trackId = track.id as any;
-    const config = userData.config;
+    const trackObj = track && typeof track === 'object' ? track as Record<string, unknown> : {};
+    const trackId = trackObj.id;
+    const userDataObj = userData && typeof userData === 'object' ? userData as Record<string, unknown> : {};
+    const config = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
 
     if (config.sequencerMode) {
       if (!sequencerEngineRef.current) {
@@ -207,12 +221,17 @@ export const useDashboardPlayback = ({
       }
 
       if (!isSequencerPlaying) {
-        const sequencerData = getSequencerForTrack(recordingData, track.id as any) as any;
-        const pattern = sequencerData.pattern || {};
-        const bpm = config.sequencerBpm || 120;
+        const sequencerData = getSequencerForTrack(recordingData as Record<string, unknown>, String(trackObj.id || ''));
+        const sequencerDataObj = sequencerData && typeof sequencerData === 'object' ? sequencerData as Record<string, unknown> : {};
+        const pattern = (sequencerDataObj.pattern && typeof sequencerDataObj.pattern === 'object' ? sequencerDataObj.pattern : {}) as Record<string, number[]>;
+        const bpm = typeof config.sequencerBpm === 'number' ? config.sequencerBpm : 120;
         sequencerEngineRef.current.load(pattern, bpm);
 
-        const keys = (track.modules || []).map((moduleInstance: any) => `${track.id}:${moduleInstance.id}`);
+        const modules = Array.isArray(trackObj.modules) ? trackObj.modules : [];
+        const keys = modules.map((moduleInstance: unknown) => {
+          const modObj = moduleInstance && typeof moduleInstance === 'object' ? moduleInstance as Record<string, unknown> : {};
+          return `${trackObj.id}:${modObj.id}`;
+        });
         setFlashingConstructors((prev) => {
           const next = new Set(prev);
           keys.forEach((k: string) => next.add(k));
@@ -227,7 +246,7 @@ export const useDashboardPlayback = ({
         }, 100);
 
         sendToProjector("track-activate", {
-          trackName: track.name,
+          trackName: trackObj.name,
         });
         sequencerEngineRef.current.play();
         if (typeof sequencerEngineRef.current.getRunId === "function") {
@@ -236,12 +255,13 @@ export const useDashboardPlayback = ({
         setIsSequencerPlaying(true);
       }
     } else {
-      const isPlaying = footerPlaybackState[trackId] || false;
+      const trackIdStr = String(trackId);
+      const isPlaying = footerPlaybackState[trackIdStr] || false;
 
-      if (!footerPlaybackEngineRef.current[trackId]) {
-        footerPlaybackEngineRef.current[trackId] = new MidiPlayback();
+      if (!footerPlaybackEngineRef.current[trackIdStr]) {
+        footerPlaybackEngineRef.current[trackIdStr] = new MidiPlayback();
 
-        footerPlaybackEngineRef.current[trackId].setOnNoteCallback((channelName: any) => {
+        footerPlaybackEngineRef.current[trackIdStr].setOnNoteCallback((channelName: unknown) => {
           const channelNumber = String(channelName).replace(/^ch/, "");
           flashChannel(channelNumber, 100);
 
@@ -250,34 +270,44 @@ export const useDashboardPlayback = ({
           });
         });
 
-        footerPlaybackEngineRef.current[trackId].setOnStopCallback(() => {
-          setFooterPlaybackState((prev) => ({ ...prev, [trackId]: false }));
+        footerPlaybackEngineRef.current[trackIdStr].setOnStopCallback(() => {
+          setFooterPlaybackState((prev) => ({ ...prev, [trackIdStr]: false }));
         });
 
         try {
-          const recording = getRecordingForTrack(recordingData, track.id as any) as any;
-          if (!recording || !recording.channels || recording.channels.length === 0) {
+          const recording = getRecordingForTrack(recordingData as Record<string, unknown>, String(trackObj.id || ''));
+          const recordingObj = recording && typeof recording === 'object' ? recording as Record<string, unknown> : {};
+          const channels = Array.isArray(recordingObj.channels) ? recordingObj.channels : [];
+          if (!recording || channels.length === 0) {
             alert("No recording available. Trigger some channels first.");
             return;
           }
 
-          const channels = recording.channels.map((ch: any) => ({
-            name: ch.name,
-            midi: 0,
-            sequences: ch.sequences || [],
-          }));
+          const mappedChannels = channels.map((ch: unknown) => {
+            const chObj = ch && typeof ch === 'object' ? ch as Record<string, unknown> : {};
+            return {
+              name: chObj.name,
+              midi: 0,
+              sequences: Array.isArray(chObj.sequences) ? chObj.sequences : [],
+            };
+          });
 
-          const bpm = track.bpm || 120;
-          footerPlaybackEngineRef.current[trackId].load(channels, bpm);
-        } catch (error: any) {
+          const bpm = trackObj.bpm || 120;
+          footerPlaybackEngineRef.current[trackIdStr].load(mappedChannels, bpm);
+        } catch (error: unknown) {
+          const errorMsg = error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : String(error);
           console.error("Error loading recording for playback:", error);
-          alert(`Failed to load recording for playback: ${error.message}`);
+          alert(`Failed to load recording for playback: ${errorMsg}`);
           return;
         }
       }
 
       if (!isPlaying) {
-        const keys = (track.modules || []).map((moduleInstance: any) => `${track.id}:${moduleInstance.id}`);
+        const modules = Array.isArray(trackObj.modules) ? trackObj.modules : [];
+        const keys = modules.map((moduleInstance: unknown) => {
+          const modObj = moduleInstance && typeof moduleInstance === 'object' ? moduleInstance as Record<string, unknown> : {};
+          return `${trackObj.id}:${modObj.id}`;
+        });
         setFlashingConstructors((prev) => {
           const next = new Set(prev);
           keys.forEach((k: string) => next.add(k));
@@ -292,11 +322,11 @@ export const useDashboardPlayback = ({
         }, 100);
 
         sendToProjector("track-activate", {
-          trackName: track.name,
+          trackName: trackObj.name,
         });
 
-        footerPlaybackEngineRef.current[trackId].play();
-        setFooterPlaybackState((prev) => ({ ...prev, [trackId]: true }));
+        footerPlaybackEngineRef.current[trackIdStr].play();
+        setFooterPlaybackState((prev) => ({ ...prev, [trackIdStr]: true }));
       }
     }
   }, [
@@ -313,7 +343,8 @@ export const useDashboardPlayback = ({
 
   const handleFooterStop = useCallback(() => {
     if (!firstVisibleTrack) return;
-    const config = userData.config;
+    const userDataObj = userData && typeof userData === 'object' ? userData as Record<string, unknown> : {};
+    const config = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
     if (config.sequencerMode) {
       if (sequencerEngineRef.current) {
         sequencerEngineRef.current.stop();
@@ -324,7 +355,8 @@ export const useDashboardPlayback = ({
         setSequencerCurrentStep(0);
       }
     } else {
-      const trackId = firstVisibleTrack.track.id;
+      const trackObj = firstVisibleTrack.track && typeof firstVisibleTrack.track === 'object' ? firstVisibleTrack.track as Record<string, unknown> : {};
+      const trackId = String(trackObj.id || '');
       if (footerPlaybackEngineRef.current[trackId]) {
         footerPlaybackEngineRef.current[trackId].stop();
         setFooterPlaybackState((prev) => ({ ...prev, [trackId]: false }));
@@ -334,15 +366,16 @@ export const useDashboardPlayback = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e as any).code !== "Space") return;
+      if (e.code !== "Space") return;
 
-      const target = e.target as any;
+      const target = e.target as EventTarget & { tagName?: string; isContentEditable?: boolean };
       const isTyping =
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
 
       if (isTyping) return;
 
-      const config = userData.config;
+      const userDataObj = userData && typeof userData === 'object' ? userData as Record<string, unknown> : {};
+      const config = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
       if (!config.sequencerMode) return;
 
       e.preventDefault();
@@ -354,10 +387,10 @@ export const useDashboardPlayback = ({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown as any);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown as any);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [userData, isSequencerPlaying, handleFooterStop, handleFooterPlayPause]);
 
@@ -381,18 +414,22 @@ export const useDashboardPlayback = ({
   }, [activeTrackId]);
 
   useEffect(() => {
-    if (!userDataRef.current?.config?.sequencerMode) return;
+    const userDataObj = userDataRef.current && typeof userDataRef.current === 'object' ? userDataRef.current as Record<string, unknown> : {};
+    const config = userDataObj.config && typeof userDataObj.config === 'object' ? userDataObj.config as Record<string, unknown> : {};
+    if (!config.sequencerMode) return;
     if (!isSequencerPlaying) return;
     if (!sequencerEngineRef.current) return;
     if (!activeTrackId) return;
 
     const tracks = getActiveSetTracks(userDataRef.current || {}, activeSetIdRef.current);
-    const track = tracks.find((t) => t.id === activeTrackId) || null;
+    const track = tracks.find((t: { id: unknown }) => t.id === activeTrackId) || null;
     if (!track) return;
+    const trackObj = track && typeof track === 'object' ? track as Record<string, unknown> : {};
 
-    const sequencerData = getSequencerForTrack(recordingDataRef.current || {}, track.id as any) as any;
-    const pattern = sequencerData.pattern || {};
-    const bpm = userDataRef.current?.config?.sequencerBpm || 120;
+    const sequencerData = getSequencerForTrack(recordingDataRef.current as Record<string, unknown> || {}, String(trackObj.id || ''));
+    const sequencerDataObj = sequencerData && typeof sequencerData === 'object' ? sequencerData as Record<string, unknown> : {};
+    const pattern = (sequencerDataObj.pattern && typeof sequencerDataObj.pattern === 'object' ? sequencerDataObj.pattern : {}) as Record<string, number[]>;
+    const bpm = typeof config.sequencerBpm === 'number' ? config.sequencerBpm : 120;
     sequencerEngineRef.current.load(pattern, bpm);
   }, [activeTrackId, isSequencerPlaying, activeSetIdRef, recordingDataRef, userDataRef]);
 

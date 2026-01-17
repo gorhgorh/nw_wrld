@@ -37,7 +37,7 @@ const SortableSetItem = ({
 }: SortableSetItemProps) => {
   return (
     <SortableWrapper id={set.id}>
-      {({ dragHandleProps, isDragging }) => (
+      {({ dragHandleProps, isDragging: _isDragging }) => (
         <div className="flex items-center gap-3 py-2">
           <span
             className="text-neutral-300 cursor-move text-md"
@@ -108,11 +108,11 @@ export const SelectSetModal = ({
   onClose,
   userData,
   setUserData,
-  activeTrackId,
+  activeTrackId: _activeTrackId,
   setActiveTrackId,
   activeSetId,
   setActiveSetId,
-  recordingData,
+  recordingData: _recordingData,
   setRecordingData,
   onCreateSet,
   onConfirmDelete,

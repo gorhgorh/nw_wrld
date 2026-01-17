@@ -206,6 +206,7 @@ export async function handleTrackSelection(trackName) {
           }
         )
       ) {
+        // No changes needed, track is the same
       } else {
         this.deactivateActiveTrack();
         this.handleTrackSelection(pending.trackName);

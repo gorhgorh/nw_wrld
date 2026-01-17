@@ -61,7 +61,7 @@ export const EditChannelModal = ({
   const track = (tracks as unknown[])[trackIndex] as Record<string, unknown> | undefined;
   const inputType = inputConfig?.type === "osc" ? "osc" : "midi";
   const noteMatchMode = inputConfig?.noteMatchMode === "exactNote" ? "exactNote" : "pitchClass";
-  const globalMappings = (userData as Record<string, unknown>).config || {};
+  const globalMappings = useMemo(() => (userData as Record<string, unknown>).config || {}, [userData]);
 
   const exactNoteOptions = useMemo(
     () => Array.from({ length: 128 }, (_, n) => ({ value: n, label: String(n) })),

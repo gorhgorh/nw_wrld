@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useMemo, useCallback } from "react";
 import { useAtom, type PrimitiveAtom } from "jotai";
 import * as d3 from "d3";
 import { SortableWrapper } from "../../shared/SortableWrapper";
@@ -9,7 +9,6 @@ import {
   selectedChannelAtom,
   flashingChannelsAtom,
   flashingConstructorsAtom,
-  useFlashingChannels,
 } from "../../core/state.ts";
 import { updateActiveSet } from "../../core/utils";
 import { TERMINAL_STYLES } from "../../core/constants.ts";
@@ -21,8 +20,6 @@ import {
   parsePitchClass,
   pitchClassToName,
 } from "../../../shared/midi/midiUtils.ts";
-import { Button } from "../Button";
-import { FaPlus } from "react-icons/fa";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { Tooltip } from "../Tooltip";
 
@@ -264,7 +261,7 @@ export const NoteSelector = memo(
           }
         });
       });
-    }, [channelsData, setUserData, trackIndex, instanceId]);
+    }, [channelsData, setUserData, trackIndex, instanceId, activeSetId]);
 
     // Create a sorted copy of the channels array
     const channels = useMemo(() => {
@@ -652,7 +649,7 @@ export const SortableModuleItem = memo(
   }: SortableModuleItemProps) => {
     return (
       <SortableWrapper id={id}>
-        {({ dragHandleProps, isDragging }) => (
+        {({ dragHandleProps, isDragging: _isDragging }) => (
           <div className="flex flex-col overflow-auto h-full">
             <div className="w-full">
               <NoteSelector

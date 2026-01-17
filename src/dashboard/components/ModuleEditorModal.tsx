@@ -1,18 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { FaTimes, FaRedo } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
 import { Button } from "./Button";
-import {
-  TextInput,
-  NumberInput,
-  ColorInput,
-  Select,
-  Checkbox,
-  TERMINAL_STYLES,
-} from "./FormInputs";
 import { getBaseMethodNames } from "../utils/moduleUtils";
-import { MethodBlock } from "./MethodBlock";
-import { HelpIcon } from "./HelpIcon";
-import { HELP_TEXT } from "../../shared/helpText";
 
 const getBridge = () => globalThis.nwWrldBridge;
 
@@ -244,7 +233,7 @@ export const ModuleEditorModal = ({
   onClose,
   moduleName,
   templateType = null,
-  onModuleSaved,
+  onModuleSaved: _onModuleSaved,
   predefinedModules = [],
   workspacePath = null,
 }: ModuleEditorModalProps) => {
@@ -294,7 +283,7 @@ export const ModuleEditorModal = ({
     );
   }, [moduleData, moduleBase, threeBase]);
 
-  const methodsWithValues = useMemo(() => {
+  const _methodsWithValues = useMemo(() => {
     return customMethods.map((method) => ({
       name: method.name,
       options: (method.options || []).map((opt) => {
@@ -522,13 +511,7 @@ export const ModuleEditorModal = ({
     }
   }, [isOpen, moduleName, templateType, workspacePath]);
 
-  useEffect(() => {
-    if (isOpen && moduleData && !isLoading) {
-      triggerPreview();
-    }
-  }, [isOpen, isLoading, moduleData]);
-
-  const triggerPreview = () => {
+  const triggerPreview = useCallback(() => {
     if (!moduleName || !moduleData) return;
 
     try {
@@ -581,14 +564,20 @@ export const ModuleEditorModal = ({
     } catch (error) {
       console.error("Error triggering preview:", error);
     }
-  };
+  }, [moduleName, moduleData]);
+
+  useEffect(() => {
+    if (isOpen && moduleData && !isLoading) {
+      triggerPreview();
+    }
+  }, [isOpen, isLoading, moduleData, triggerPreview]);
 
   const clearPreview = () => {
     const bridge = getBridge();
     bridge?.messaging?.sendToProjector?.("clear-preview", {});
   };
 
-  const handleMethodTrigger = (method: MethodWithValues) => {
+  const _handleMethodTrigger = (method: MethodWithValues) => {
     const params: Record<string, unknown> = {};
     method.options.forEach((opt) => {
       params[opt.name] = opt.value;
@@ -602,7 +591,7 @@ export const ModuleEditorModal = ({
     });
   };
 
-  const handleOptionChange = useCallback(
+  const _handleOptionChange = useCallback(
     (methodName: string, optionName: string, value: unknown) => {
     setMethodOptions((prev) => ({
       ...prev,

@@ -17,7 +17,7 @@ const waitForProjectReady = async (page: import("playwright").Page) => {
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   Boolean(v) && typeof v === "object" && !Array.isArray(v);
 
-const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const _asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 const readJson = async (filePath: string) => {
   const raw = await fs.readFile(filePath, "utf-8");

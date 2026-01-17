@@ -175,9 +175,7 @@ const loadUserData = async () => {
     };
   }
 
-  (migratedData as Record<string, unknown>)._loadedSuccessfully = !Boolean(
-    (migratedData as Record<string, unknown>)._isDefaultData
-  );
+  (migratedData as Record<string, unknown>)._loadedSuccessfully = !(migratedData as Record<string, unknown>)._isDefaultData;
   return migratedData as unknown;
 };
 
