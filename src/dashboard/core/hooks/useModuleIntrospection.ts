@@ -15,6 +15,46 @@ export const useModuleIntrospection = ({
   setWorkspaceModuleLoadFailures,
 }: UseModuleIntrospectionArgs) => {
   useIPCListener("from-projector", (_event, data: unknown) => {
+    const d = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+    if (d.type !== "workspace-modules-failed" && d.type !== "workspace-modules-loaded") return;
+    const payload =
+      d.props && typeof d.props === "object" ? (d.props as Record<string, unknown>) : {};
+    const moduleIdsRaw = Array.isArray(payload.moduleIds) ? payload.moduleIds : [];
+    const moduleIds = moduleIdsRaw.map((x) => String(x || "").trim()).filter(Boolean);
+    if (!moduleIds.length) return;
+
+    if (d.type === "workspace-modules-loaded") {
+      setWorkspaceModuleLoadFailures((prev) =>
+        (Array.isArray(prev) ? prev : []).filter((id) => !moduleIds.includes(String(id)))
+      );
+      setPredefinedModules((prev) =>
+        (prev || []).map((m) => {
+          const mObj = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
+          const id = mObj.id ? String(mObj.id) : "";
+          if (!id || !moduleIds.includes(id)) return m;
+          return mObj.status === "failed" ? ({ ...mObj, status: "uninspected" } as typeof m) : m;
+        })
+      );
+      return;
+    }
+
+    setWorkspaceModuleLoadFailures((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      const out = new Set(list.map((x) => String(x)));
+      moduleIds.forEach((id) => out.add(id));
+      return Array.from(out);
+    });
+    setPredefinedModules((prev) =>
+      (prev || []).map((m) => {
+        const mObj = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
+        const id = mObj.id ? String(mObj.id) : "";
+        if (!id || !moduleIds.includes(id)) return m;
+        return { ...mObj, status: "failed" } as typeof m;
+      })
+    );
+  });
+
+  useIPCListener("from-projector", (_event, data: unknown) => {
     const d = data && typeof data === 'object' ? data as Record<string, unknown> : {};
     if (d.type !== "module-introspect-result") return;
     const payload = d.props && typeof d.props === 'object' ? d.props as Record<string, unknown> : {};

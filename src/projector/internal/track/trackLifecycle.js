@@ -131,6 +131,7 @@ export async function handleTrackSelection(trackName) {
       moduleSources[t] = { text: src?.text || "" };
     }
     this.trackModuleSources = moduleSources;
+    const moduleTypeList = Array.from(seenTypes);
 
     if (!this.trackSandboxHost) {
       this.trackSandboxHost = new TrackSandboxHost(modulesContainer);
@@ -149,8 +150,30 @@ export async function handleTrackSelection(trackName) {
       assetsBaseUrl,
     });
     if (!res || res.ok !== true) {
+      const resObj = res && typeof res === "object" ? res : {};
+      const failedModuleType =
+        resObj && typeof resObj.moduleType === "string" ? String(resObj.moduleType) : "";
+      if (failedModuleType) {
+        try {
+          const messaging = getMessaging();
+          messaging?.sendToDashboard?.("workspace-modules-failed", {
+            moduleIds: [failedModuleType],
+            trackName,
+            error: String(resObj.error || "SANDBOX_TRACK_INIT_FAILED"),
+          });
+        } catch {}
+      }
       throw new Error(res?.error || "SANDBOX_TRACK_INIT_FAILED");
     }
+    try {
+      const messaging = getMessaging();
+      if (moduleTypeList.length) {
+        messaging?.sendToDashboard?.("workspace-modules-loaded", {
+          moduleIds: moduleTypeList,
+          trackName,
+        });
+      }
+    } catch {}
 
     this.activeModules = {};
     for (const m of track.modules) {

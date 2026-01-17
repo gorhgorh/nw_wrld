@@ -155,7 +155,9 @@ const waitForWorkspaceSettle = async (modulesDir: string, filename: string | nul
   }
 };
 
-const broadcastWorkspaceModulesChanged = () => {
+const broadcastWorkspaceModulesChanged = (filename: string | null) => {
+  const safeFilename = filename && typeof filename === "string" ? filename : null;
+  const payload = safeFilename ? { filename: safeFilename } : {};
   const dash = state.dashboardWindow as
     | {
         isDestroyed(): boolean;
@@ -168,7 +170,7 @@ const broadcastWorkspaceModulesChanged = () => {
     dash.webContents &&
     !dash.webContents.isDestroyed()
   ) {
-    dash.webContents.send("workspace:modulesChanged", {});
+    dash.webContents.send("workspace:modulesChanged", payload);
   }
 
   const proj = state.projector1Window as
@@ -183,7 +185,7 @@ const broadcastWorkspaceModulesChanged = () => {
     proj.webContents &&
     !proj.webContents.isDestroyed()
   ) {
-    proj.webContents.send("workspace:modulesChanged", {});
+    proj.webContents.send("workspace:modulesChanged", payload);
   }
 };
 
@@ -292,7 +294,7 @@ export const startWorkspaceWatcher = (workspacePath: string | null) => {
         try {
           await waitForWorkspaceSettle(modulesDir, filename ? String(filename) : null);
         } catch {}
-        broadcastWorkspaceModulesChanged();
+        broadcastWorkspaceModulesChanged(filename ? String(filename) : null);
       }, 350);
     });
     state.workspaceWatcher.on("error", () => {

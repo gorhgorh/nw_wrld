@@ -9,7 +9,7 @@ import {
   updateUserData,
   updateActiveSet,
 } from "./core/utils";
-import { useIPCSend, useIPCInvoke } from "./core/hooks/useIPC";
+import { useIPCSend, useIPCInvoke, useIPCListener } from "./core/hooks/useIPC";
 import { useLatestRef } from "./core/hooks/useLatestRef";
 import {
   userDataAtom,
@@ -319,7 +319,6 @@ const Dashboard = () => {
   });
   useProjectorPerfStats(setPerfStats);
 
-  const ipcInvoke = useIPCInvoke();
   useWorkspaceModules({
     workspacePath,
     isWorkspaceModalOpen,
@@ -336,6 +335,75 @@ const Dashboard = () => {
     didMigrateWorkspaceModuleTypesRef,
     loadModulesRunIdRef,
   });
+
+  const pendingModuleIntrospectionsRef = useRef(new Set());
+  const pendingFullWorkspaceIntrospectionRef = useRef(false);
+  const moduleIntrospectionDrainRunIdRef = useRef(0);
+  useIPCListener(
+    "workspace:modulesChanged",
+    (_event, payload) => {
+      if (!workspacePath) return;
+      const p = payload && typeof payload === "object" ? payload : null;
+      const filenameRaw = p && "filename" in p ? p.filename : null;
+      const filename = typeof filenameRaw === "string" ? filenameRaw : "";
+      if (!filename || !/\.js$/i.test(filename)) {
+        pendingFullWorkspaceIntrospectionRef.current = true;
+        return;
+      }
+      const moduleId = filename.replace(/\.js$/i, "").trim();
+      if (!/^[A-Za-z][A-Za-z0-9]*$/.test(moduleId)) return;
+      try {
+        pendingModuleIntrospectionsRef.current.add(moduleId);
+      } catch {}
+    },
+    [workspacePath]
+  );
+
+  const prevProjectorReadyRef = useRef(false);
+  useEffect(() => {
+    const prev = prevProjectorReadyRef.current;
+    prevProjectorReadyRef.current = isProjectorReady;
+    if (prev || !isProjectorReady) return;
+    if (!workspacePath) return;
+    const failures = Array.isArray(workspaceModuleLoadFailures)
+      ? workspaceModuleLoadFailures.filter(Boolean)
+      : [];
+    const pending = Array.from(pendingModuleIntrospectionsRef.current || []);
+    const pendingAll = pendingFullWorkspaceIntrospectionRef.current === true;
+    const workspaceIds =
+      pendingAll && Array.isArray(workspaceModuleFiles)
+        ? workspaceModuleFiles.map((x) => String(x || "").trim()).filter(Boolean)
+        : [];
+    const ids = Array.from(new Set([...failures, ...pending, ...workspaceIds])).filter((id) =>
+      /^[A-Za-z][A-Za-z0-9]*$/.test(String(id))
+    );
+    if (!ids.length) return;
+    try {
+      pendingModuleIntrospectionsRef.current.clear();
+    } catch {}
+    try {
+      pendingFullWorkspaceIntrospectionRef.current = false;
+    } catch {}
+    const runId = ++moduleIntrospectionDrainRunIdRef.current;
+    const batchSize = 25;
+    const drain = (startIndex) => {
+      if (moduleIntrospectionDrainRunIdRef.current !== runId) return;
+      const batch = ids.slice(startIndex, startIndex + batchSize);
+      batch.forEach((moduleId) => {
+        sendToProjector("module-introspect", { moduleId: String(moduleId) });
+      });
+      const next = startIndex + batchSize;
+      if (next >= ids.length) return;
+      setTimeout(() => drain(next), 60);
+    };
+    drain(0);
+  }, [
+    isProjectorReady,
+    workspacePath,
+    workspaceModuleLoadFailures,
+    workspaceModuleFiles,
+    sendToProjector,
+  ]);
   useDashboardBootstrap({
     isInitialMountRef: isInitialMount,
     userDataLoadedSuccessfullyRef: userDataLoadedSuccessfully,
@@ -353,8 +421,8 @@ const Dashboard = () => {
   });
 
   const handleSelectWorkspace = useCallback(async () => {
-    await ipcInvoke("workspace:select");
-  }, [ipcInvoke]);
+    await invokeIPC("workspace:select");
+  }, [invokeIPC]);
 
   const openAddModuleModal = useCallback((trackIndex) => {
     setSelectedTrackForModuleMenu(trackIndex);

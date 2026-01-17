@@ -129,8 +129,29 @@ export const useWorkspaceModules = ({
         })
         .filter(Boolean) as ModuleEntry[];
       if (isStale()) return;
-      setPredefinedModules(validModules);
-      setWorkspaceModuleLoadFailures([]);
+      setPredefinedModules((prev) => {
+        const prevList = Array.isArray(prev) ? prev : [];
+        const prevById = new Map(prevList.map((m) => [String(m.id || ""), m]));
+        return validModules.map((m) => {
+          const existing = prevById.get(String(m.id || "")) || null;
+          if (!existing) return m;
+          const status = existing.status;
+          const methods = Array.isArray(existing.methods) ? existing.methods : null;
+          const next: ModuleEntry = { ...m };
+          if (status === "failed" || status === "ready") {
+            next.status = status;
+          }
+          if (methods) {
+            next.methods = methods;
+          }
+          return next;
+        });
+      });
+      setWorkspaceModuleLoadFailures((prev) => {
+        const list = Array.isArray(prev) ? prev : [];
+        const idSet = new Set(allModuleIds.map((x) => String(x)));
+        return list.filter((id) => idSet.has(String(id)));
+      });
       setIsProjectorReady(false);
       if (isStale()) return;
       sendToProjector("refresh-projector", {});
@@ -258,10 +279,6 @@ export const useWorkspaceModules = ({
   useIPCListener(
     "workspace:modulesChanged",
     () => {
-      if (workspacePath) {
-        loadModules();
-        return;
-      }
       loadModules();
     },
     [loadModules]

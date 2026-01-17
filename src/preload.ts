@@ -76,6 +76,7 @@ const nwWrldBridge = {
     getVersion: () => ipcRenderer.sendSync("bridge:app:getVersion") as unknown,
     getRepositoryUrl: () => ipcRenderer.sendSync("bridge:app:getRepositoryUrl") as unknown,
     isPackaged: () => ipcRenderer.sendSync("bridge:app:isPackaged") as unknown,
+    openProjectorDevTools: () => ipcRenderer.send("bridge:app:openProjectorDevTools"),
   },
   messaging: {
     sendToProjector: (type: unknown, props: unknown = {}) =>

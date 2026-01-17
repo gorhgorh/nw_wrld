@@ -149,16 +149,91 @@ class ${badId} extends ModuleBase {
           const gotReady = msgs.some(
             (x) => x.type === "preview-module-ready" && x.props?.moduleName === goodId
           );
-          const gotError = msgs.some(
-            (x) => x.type === "preview-module-error" && x.props?.moduleName === goodId
-          );
-          if (gotError) return "error";
           if (gotReady) return "ready";
           return "pending";
         },
         { timeout: 25_000 }
       )
       .toBe("ready");
+
+    await clearDashboardMessages(dashboard);
+    await fs.writeFile(
+      badModulePath,
+      `/*
+@nwWrld name: ${badId}
+@nwWrld category: Test
+@nwWrld imports: ModuleBase
+*/
+
+class ${badId} extends ModuleBase {
+  static methods = [];
+  constructor(container) {
+    super(container);
+    this.init();
+  }
+  init() {
+    const html = \`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;">${badId}</div>\`;
+    this.elem.insertAdjacentHTML("beforeend", html);
+  }
+}
+
+export default ${badId};
+`,
+      "utf-8"
+    );
+
+    await expect
+      .poll(
+        async () => {
+          const msgs = await getDashboardMessages(dashboard);
+          const status = msgs.find((m) => m.type === "module-introspect-result") || null;
+          if (!status) return "pending";
+          if (status.props?.moduleId === badId && status.props?.ok === true) return "ok";
+          return "other";
+        },
+        { timeout: 25_000 }
+      )
+      .toBe("ok");
+    await expect(failedIcon).toBeHidden({ timeout: 25_000 });
+
+    await clearDashboardMessages(dashboard);
+    await fs.writeFile(
+      badModulePath,
+      `/*
+@nwWrld name: ${badId}
+@nwWrld category: Test
+@nwWrld imports: ModuleBase
+*/
+
+class ${badId} extends ModuleBase {
+  static methods = [];
+  constructor(container) {
+    super(container);
+    this.init();
+  }
+  init() {
+    if @@@m) return;
+  }
+}
+
+export default ${badId};
+`,
+      "utf-8"
+    );
+
+    await expect
+      .poll(
+        async () => {
+          const msgs = await getDashboardMessages(dashboard);
+          const status = msgs.find((m) => m.type === "module-introspect-result") || null;
+          if (!status) return "pending";
+          if (status.props?.moduleId === badId && status.props?.ok === false) return "failed";
+          return "other";
+        },
+        { timeout: 25_000 }
+      )
+      .toBe("failed");
+    await expect(failedIcon).toBeVisible({ timeout: 25_000 });
   } finally {
     try {
       await app.close();

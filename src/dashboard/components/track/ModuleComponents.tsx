@@ -397,7 +397,23 @@ export const NoteSelector = memo(
             {moduleWarningText ? (
               <span className="ml-2 inline-flex items-center">
                 <Tooltip content={moduleWarningText} position="top">
-                  <span className="text-red-500/70 text-[11px] cursor-help">
+                  <span
+                    className="text-red-500/70 text-[11px] cursor-help"
+                    data-testid="workspace-module-warning"
+                    data-warning={isLoadFailed ? "load-failed" : isFileMissing ? "missing-file" : "unknown"}
+                    data-module-type={moduleType}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        (
+                          globalThis as unknown as {
+                            nwWrldBridge?: { app?: { openProjectorDevTools?: () => void } };
+                          }
+                        )?.nwWrldBridge?.app?.openProjectorDevTools?.();
+                      } catch {}
+                    }}
+                  >
                     <FaExclamationTriangle />
                   </span>
                 </Tooltip>

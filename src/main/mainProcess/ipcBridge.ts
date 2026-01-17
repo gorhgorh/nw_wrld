@@ -613,6 +613,21 @@ export function registerIpcBridge(): void {
     }
   });
 
+  ipcMain.on("bridge:app:openProjectorDevTools", (event) => {
+    try {
+      const win = state.projector1Window as {
+        isDestroyed?: () => boolean;
+        webContents?: { isDestroyed?: () => boolean; openDevTools?: (opts?: unknown) => void };
+      } | null;
+      if (!win || win.isDestroyed?.()) return;
+      const wc = win.webContents;
+      if (!wc || wc.isDestroyed?.()) return;
+      if (typeof wc.openDevTools === "function") {
+        wc.openDevTools({ mode: "detach" });
+      }
+    } catch {}
+  });
+
   ipcMain.on("bridge:app:getMethodCode", (event, moduleName, methodName) => {
     try {
       const normalized = normalizeGetMethodCodeArgs(moduleName, methodName);

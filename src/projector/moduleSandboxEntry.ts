@@ -352,63 +352,67 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         const instanceId = String(m?.id || "").trim();
         const moduleType = String(m?.type || "").trim();
         if (!instanceId || !moduleType) continue;
+        try {
+          const constructorMethods = Array.isArray(modulesData?.[instanceId]?.constructor)
+            ? modulesData[instanceId].constructor
+            : [];
+          const matrixMethod =
+            constructorMethods.find((mm) => mm?.name === "matrix") || null;
+          const matrix = parseMatrixOptions(matrixMethod?.options);
 
-        const constructorMethods = Array.isArray(modulesData?.[instanceId]?.constructor)
-          ? modulesData[instanceId].constructor
-          : [];
-        const matrixMethod =
-          constructorMethods.find((mm) => mm?.name === "matrix") || null;
-        const matrix = parseMatrixOptions(matrixMethod?.options);
+          const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
+          const width = `${100 / matrix.cols}%`;
+          const height = `${100 / matrix.rows}%`;
+          const border = matrix.border ? "1px solid white" : "none";
 
-        const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
-        const width = `${100 / matrix.cols}%`;
-        const height = `${100 / matrix.rows}%`;
-        const border = matrix.border ? "1px solid white" : "none";
+          const ModuleClass = await getModuleClass(moduleType, moduleSources);
+          const instances = [];
 
-        const ModuleClass = await getModuleClass(moduleType, moduleSources);
-        const instances = [];
-
-        for (let row = 1; row <= matrix.rows; row++) {
-          for (let col = 1; col <= matrix.cols; col++) {
-            const cellKey = `${row}-${col}`;
-            if (matrix.excludedCells.includes(cellKey)) continue;
-            const el = document.createElement("div");
-            el.className = `module z-index-container ${moduleType}`;
-            el.dataset.instanceId = instanceId;
-            const top = `${(100 / matrix.rows) * (row - 1)}%`;
-            const left = `${(100 / matrix.cols) * (col - 1)}%`;
-            el.style.cssText = [
-              "position:absolute",
-              `width:${width}`,
-              `height:${height}`,
-              `top:${top}`,
-              `left:${left}`,
-              `z-index:${zIndex}`,
-              `border:${border}`,
-              "overflow:hidden",
-              "transform-origin:center",
-            ].join(";");
-            root.appendChild(el);
-            const inst = new ModuleClass(el);
-            instances.push(inst);
+          for (let row = 1; row <= matrix.rows; row++) {
+            for (let col = 1; col <= matrix.cols; col++) {
+              const cellKey = `${row}-${col}`;
+              if (matrix.excludedCells.includes(cellKey)) continue;
+              const el = document.createElement("div");
+              el.className = `module z-index-container ${moduleType}`;
+              el.dataset.instanceId = instanceId;
+              const top = `${(100 / matrix.rows) * (row - 1)}%`;
+              const left = `${(100 / matrix.cols) * (col - 1)}%`;
+              el.style.cssText = [
+                "position:absolute",
+                `width:${width}`,
+                `height:${height}`,
+                `top:${top}`,
+                `left:${left}`,
+                `z-index:${zIndex}`,
+                `border:${border}`,
+                "overflow:hidden",
+                "transform-origin:center",
+              ].join(";");
+              root.appendChild(el);
+              const inst = new ModuleClass(el);
+              instances.push(inst);
+            }
           }
-        }
 
-        instancesById.set(instanceId, { moduleType, instances });
+          instancesById.set(instanceId, { moduleType, instances });
 
-        const nonMatrix = constructorMethods.filter(
-          (mm) => mm?.name && mm.name !== "matrix"
-        );
-        for (const mm of nonMatrix) {
-          const methodName = String(mm.name || "").trim();
-          if (!methodName) continue;
-          const opts = buildMethodOptions(mm.options);
-          for (const inst of instances) {
-            const fn = inst?.[methodName];
-            if (typeof fn !== "function") continue;
-            const r = fn.call(inst, opts);
-            if (r && typeof r.then === "function") await r;
+          const nonMatrix = constructorMethods.filter(
+            (mm) => mm?.name && mm.name !== "matrix"
+          );
+          for (const mm of nonMatrix) {
+            const methodName = String(mm.name || "").trim();
+            if (!methodName) continue;
+            const opts = buildMethodOptions(mm.options);
+            for (const inst of instances) {
+              const fn = inst?.[methodName];
+              if (typeof fn !== "function") continue;
+              const r = fn.call(inst, opts);
+              if (r && typeof r.then === "function") await r;
+            }
           }
+        } catch (e) {
+          respond({ ok: false, error: e?.message || "SANDBOX_ERROR", moduleType });
+          return;
         }
       }
 
@@ -457,60 +461,65 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
         return;
       }
 
-      const matrix = parseMatrixOptions(props.matrixOptions);
-      destroyInstance(instanceId);
+      try {
+        const matrix = parseMatrixOptions(props.matrixOptions);
+        destroyInstance(instanceId);
 
-      const root = ensureRoot();
-      const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
-      const width = `${100 / matrix.cols}%`;
-      const height = `${100 / matrix.rows}%`;
-      const border = matrix.border ? "1px solid white" : "none";
+        const root = ensureRoot();
+        const zIndex = getInstanceIndex(trackModules, instanceId) + 1;
+        const width = `${100 / matrix.cols}%`;
+        const height = `${100 / matrix.rows}%`;
+        const border = matrix.border ? "1px solid white" : "none";
 
-      const ctor = Array.isArray(modulesData?.[instanceId]?.constructor)
-        ? modulesData[instanceId].constructor
-        : [];
-      const nonMatrix = ctor.filter((mm) => mm?.name && mm.name !== "matrix");
+        const ctor = Array.isArray(modulesData?.[instanceId]?.constructor)
+          ? modulesData[instanceId].constructor
+          : [];
+        const nonMatrix = ctor.filter((mm) => mm?.name && mm.name !== "matrix");
 
-      const ModuleClass = await getModuleClass(moduleType, moduleSources);
-      const instances = [];
-      for (let row = 1; row <= matrix.rows; row++) {
-        for (let col = 1; col <= matrix.cols; col++) {
-          const cellKey = `${row}-${col}`;
-          if (matrix.excludedCells.includes(cellKey)) continue;
-          const el = document.createElement("div");
-          el.className = `module z-index-container ${moduleType}`;
-          el.dataset.instanceId = instanceId;
-          const top = `${(100 / matrix.rows) * (row - 1)}%`;
-          const left = `${(100 / matrix.cols) * (col - 1)}%`;
-          el.style.cssText = [
-            "position:absolute",
-            `width:${width}`,
-            `height:${height}`,
-            `top:${top}`,
-            `left:${left}`,
-            `z-index:${zIndex}`,
-            `border:${border}`,
-            "overflow:hidden",
-            "transform-origin:center",
-          ].join(";");
-          root.appendChild(el);
-          const inst = new ModuleClass(el);
-          instances.push(inst);
+        const ModuleClass = await getModuleClass(moduleType, moduleSources);
+        const instances = [];
+        for (let row = 1; row <= matrix.rows; row++) {
+          for (let col = 1; col <= matrix.cols; col++) {
+            const cellKey = `${row}-${col}`;
+            if (matrix.excludedCells.includes(cellKey)) continue;
+            const el = document.createElement("div");
+            el.className = `module z-index-container ${moduleType}`;
+            el.dataset.instanceId = instanceId;
+            const top = `${(100 / matrix.rows) * (row - 1)}%`;
+            const left = `${(100 / matrix.cols) * (col - 1)}%`;
+            el.style.cssText = [
+              "position:absolute",
+              `width:${width}`,
+              `height:${height}`,
+              `top:${top}`,
+              `left:${left}`,
+              `z-index:${zIndex}`,
+              `border:${border}`,
+              "overflow:hidden",
+              "transform-origin:center",
+            ].join(";");
+            root.appendChild(el);
+            const inst = new ModuleClass(el);
+            instances.push(inst);
+          }
         }
-      }
 
-      instancesById.set(instanceId, { moduleType, instances });
+        instancesById.set(instanceId, { moduleType, instances });
 
-      for (const mm of nonMatrix) {
-        const methodName = String(mm.name || "").trim();
-        if (!methodName) continue;
-        const opts = buildMethodOptions(mm.options);
-        for (const inst of instances) {
-          const fn = inst?.[methodName];
-          if (typeof fn !== "function") continue;
-          const r = fn.call(inst, opts);
-          if (r && typeof r.then === "function") await r;
+        for (const mm of nonMatrix) {
+          const methodName = String(mm.name || "").trim();
+          if (!methodName) continue;
+          const opts = buildMethodOptions(mm.options);
+          for (const inst of instances) {
+            const fn = inst?.[methodName];
+            if (typeof fn !== "function") continue;
+            const r = fn.call(inst, opts);
+            if (r && typeof r.then === "function") await r;
+          }
         }
+      } catch (e) {
+        respond({ ok: false, error: e?.message || "SANDBOX_ERROR", moduleType });
+        return;
       }
 
       respond({ ok: true });

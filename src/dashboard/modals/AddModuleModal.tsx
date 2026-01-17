@@ -428,6 +428,17 @@ export const AddModuleModal = ({
                                 className="text-red-500/70 text-[11px] cursor-help"
                                 data-testid="module-load-failed"
                                 data-module-name={moduleId}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  try {
+                                    (
+                                      globalThis as unknown as {
+                                        nwWrldBridge?: { app?: { openProjectorDevTools?: () => void } };
+                                      }
+                                    )?.nwWrldBridge?.app?.openProjectorDevTools?.();
+                                  } catch {}
+                                }}
                               >
                                 <FaExclamationTriangle />
                               </span>
