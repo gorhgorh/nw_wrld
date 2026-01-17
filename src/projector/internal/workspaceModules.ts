@@ -1,6 +1,22 @@
-import { getBridge } from "./bridge.js";
+import { getBridge } from "./bridge";
 
-export async function loadWorkspaceModuleSource(moduleType) {
+type ReadModuleWithMetaResult = {
+  text?: unknown;
+  mtimeMs?: unknown;
+};
+
+type WorkspaceModulesContext = {
+  workspacePath: unknown;
+  workspaceModuleSourceCache: Map<
+    string,
+    Promise<{ moduleId: string; text: string; mtimeMs: number }>
+  >;
+};
+
+export async function loadWorkspaceModuleSource(
+  this: WorkspaceModulesContext,
+  moduleType: unknown
+): Promise<{ moduleId: string; text: string; mtimeMs: number } | null> {
   if (!moduleType) return null;
 
   const safeModuleType = String(moduleType).trim();
@@ -26,17 +42,17 @@ export async function loadWorkspaceModuleSource(moduleType) {
     throw new Error(`[Projector] Workspace module bridge is unavailable.`);
   }
 
-  const info = await bridge.workspace.readModuleWithMeta(safeModuleType);
+  const info = (await bridge.workspace.readModuleWithMeta(
+    safeModuleType
+  )) as ReadModuleWithMetaResult | null;
   if (!info || typeof info.text !== "string") {
-    throw new Error(
-      `[Projector] Workspace module not found: "${safeModuleType}".`
-    );
+    throw new Error(`[Projector] Workspace module not found: "${safeModuleType}".`);
   }
 
   const mtimeMs = typeof info.mtimeMs === "number" ? info.mtimeMs : 0;
   const cacheKey = `${safeModuleType}:${mtimeMs}`;
   if (this.workspaceModuleSourceCache.has(cacheKey)) {
-    return this.workspaceModuleSourceCache.get(cacheKey);
+    return this.workspaceModuleSourceCache.get(cacheKey) || null;
   }
 
   const promise = Promise.resolve({

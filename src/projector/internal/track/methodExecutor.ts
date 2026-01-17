@@ -2,12 +2,43 @@ import { forEach } from "lodash";
 import { buildMethodOptions } from "../../../shared/utils/methodOptions.ts";
 import logger from "../../helpers/logger";
 
+type MethodEntry = { name?: unknown; options?: unknown };
+
+type MethodExecutorContext = {
+  debugOverlayActive: boolean;
+  logToMain: (message: unknown) => unknown;
+  queueDebugLog: (log: string) => unknown;
+  methodOptionNoRepeatCache: { get?: (key: string) => unknown; set?: (k: string, v: unknown) => void } | null;
+
+  trackSandboxHost:
+    | null
+    | {
+        token?: unknown;
+        setMatrixForInstance?: (args: {
+          instanceId: unknown;
+          track: unknown;
+          moduleSources: unknown;
+          assetsBaseUrl: unknown;
+          matrixOptions: unknown;
+        }) => Promise<unknown>;
+        invokeOnInstance?: (
+          instanceId: unknown,
+          methodName: unknown,
+          options: unknown
+        ) => Promise<unknown>;
+      };
+  activeTrack: unknown;
+  trackModuleSources: unknown;
+  getAssetsBaseUrlForSandboxToken: (token: unknown) => string | null;
+};
+
 export async function executeMethods(
-  methods,
-  instanceId,
-  moduleInstances,
+  this: MethodExecutorContext,
+  methods: unknown,
+  instanceId: unknown,
+  moduleInstances: unknown,
   isConstructor = false,
-  debugContext = {}
+  debugContext: Record<string, unknown> = {}
 ) {
   const debugEnabled = logger.debugEnabled;
   const overlayDebug = debugEnabled && this.debugOverlayActive;
@@ -20,39 +51,48 @@ export async function executeMethods(
   }
 
   let needsMatrixUpdate = false;
-  let matrixOptions = null;
-  let otherMethods = [];
-  forEach(methods, (method) => {
-    if (method.name === "matrix") {
+  let matrixOptions: unknown = null;
+  const otherMethods: unknown[] = [];
+  forEach(methods as unknown, (methodRaw) => {
+    const method = methodRaw as MethodEntry | null;
+    if (method?.name === "matrix") {
       needsMatrixUpdate = true;
       matrixOptions = method.options;
     } else {
-      otherMethods.push(method);
+      otherMethods.push(methodRaw);
     }
   });
 
   if (needsMatrixUpdate && this.trackSandboxHost && this.activeTrack) {
     const assetsBaseUrl = this.getAssetsBaseUrlForSandboxToken(
-      this.trackSandboxHost?.token
+      (this.trackSandboxHost as { token?: unknown } | null)?.token
     );
     const moduleSources = this.trackModuleSources || {};
     if (assetsBaseUrl) {
-      const res = await this.trackSandboxHost.setMatrixForInstance({
+      const res = await this.trackSandboxHost?.setMatrixForInstance?.({
         instanceId,
         track: this.activeTrack,
         moduleSources,
         assetsBaseUrl,
         matrixOptions,
       });
-      if (!res || res.ok !== true) {
-        throw new Error(res?.error || "SANDBOX_SET_MATRIX_FAILED");
+      if (!res || typeof res !== "object" || (res as { ok?: unknown }).ok !== true) {
+        throw new Error(
+          String(
+            (res as { error?: unknown } | null)?.error || "SANDBOX_SET_MATRIX_FAILED"
+          )
+        );
       }
     }
   }
 
   if (debugEnabled) logger.log(`⏱️ Other methods execution start: ${instanceId}`);
   await Promise.all(
-    otherMethods.map(async ({ name: methodName, options: methodOptions }) => {
+    otherMethods.map(async (methodRaw) => {
+      const { name: methodName, options: methodOptions } = methodRaw as {
+        name?: unknown;
+        options?: unknown;
+      };
       const options = buildMethodOptions(methodOptions, {
         onInvalidRandomRange: ({ name, min, max, value }) => {
           if (debugEnabled) {
@@ -68,20 +108,24 @@ export async function executeMethods(
             );
           }
         },
-        noRepeatCache: this.methodOptionNoRepeatCache,
+        noRepeatCache: this.methodOptionNoRepeatCache || undefined,
         noRepeatKeyPrefix: `${instanceId}:${methodName}`,
       });
 
       if (overlayDebug) {
         const timestamp = (
-          debugContext.timestamp || performance.now() / 1000
+          ((debugContext as { timestamp?: unknown } | null)?.timestamp ||
+            performance.now() / 1000) as number
         ).toFixed(5);
         let log = `[${timestamp}] Method Execution\n`;
-        if (debugContext.trackName) {
-          log += `  Track: ${debugContext.trackName}\n`;
+        if ((debugContext as { trackName?: unknown } | null)?.trackName) {
+          log += `  Track: ${(debugContext as { trackName?: unknown }).trackName}\n`;
         }
-        if (debugContext.moduleInfo) {
-          log += `  Module: ${debugContext.moduleInfo.instanceId} (${debugContext.moduleInfo.type})\n`;
+        if ((debugContext as { moduleInfo?: unknown } | null)?.moduleInfo) {
+          const mi = (debugContext as { moduleInfo?: unknown }).moduleInfo as
+            | { instanceId?: unknown; type?: unknown }
+            | null;
+          log += `  Module: ${mi?.instanceId} (${mi?.type})\n`;
         }
         log += `  Method: ${methodName}\n`;
         if (options && Object.keys(options).length > 0) {
@@ -99,9 +143,11 @@ export async function executeMethods(
 
       const host = this.trackSandboxHost;
       if (!host) return;
-      const res = await host.invokeOnInstance(instanceId, methodName, options);
-      if (!res || res.ok !== true) {
-        throw new Error(res?.error || "SANDBOX_INVOKE_FAILED");
+      const res = await host.invokeOnInstance?.(instanceId, methodName, options);
+      if (!res || typeof res !== "object" || (res as { ok?: unknown }).ok !== true) {
+        throw new Error(
+          String((res as { error?: unknown } | null)?.error || "SANDBOX_INVOKE_FAILED")
+        );
       }
 
       if (isConstructor) {

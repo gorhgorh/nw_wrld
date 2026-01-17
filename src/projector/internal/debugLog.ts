@@ -1,7 +1,13 @@
 import logger from "../helpers/logger";
-import { getMessaging } from "./bridge.js";
+import { getMessaging } from "./bridge";
 
-export function queueDebugLog(log) {
+type DebugLogContext = {
+  debugOverlayActive: boolean;
+  debugLogQueue: string[];
+  debugLogTimeout: ReturnType<typeof setTimeout> | null;
+};
+
+export function queueDebugLog(this: DebugLogContext, log: string): void {
   if (!this.debugOverlayActive || !logger.debugEnabled) return;
 
   this.debugLogQueue.push(log);

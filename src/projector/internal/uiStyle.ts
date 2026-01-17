@@ -1,6 +1,27 @@
 import logger from "../helpers/logger";
 
-export function applyConfigSettings() {
+type AspectRatioSetting = {
+  id: string;
+  width: string;
+  height: string;
+};
+
+type BackgroundColorSetting = {
+  id: string;
+  value: string;
+};
+
+type UiStyleContext = {
+  config: { aspectRatio?: string; bgColor?: string };
+  settings: {
+    aspectRatios: AspectRatioSetting[];
+    backgroundColors: BackgroundColorSetting[];
+  };
+  toggleAspectRatioStyle: (selectedRatioId: string) => void;
+  setBg: (colorId: string) => void;
+};
+
+export function applyConfigSettings(this: UiStyleContext): void {
   const config = this.config;
   if (config.aspectRatio) {
     this.toggleAspectRatioStyle(config.aspectRatio);
@@ -10,7 +31,10 @@ export function applyConfigSettings() {
   }
 }
 
-export function toggleAspectRatioStyle(selectedRatioId) {
+export function toggleAspectRatioStyle(
+  this: UiStyleContext,
+  selectedRatioId: string
+): void {
   document.documentElement.classList.remove("reel", "portrait", "scale");
 
   const dispatchResize = () => {
@@ -32,7 +56,7 @@ export function toggleAspectRatioStyle(selectedRatioId) {
     if (logger.debugEnabled) {
       logger.warn(`Aspect ratio "${selectedRatioId}" not found in settings`);
     }
-    document.body.style = ``;
+    document.body.style.cssText = "";
     dispatchResize();
     return;
   }
@@ -42,7 +66,7 @@ export function toggleAspectRatioStyle(selectedRatioId) {
     ratio.id === "landscape" ||
     ratio.id === "fullscreen"
   ) {
-    document.body.style = ``;
+    document.body.style.cssText = "";
   } else {
     if (ratio.id === "9-16") {
       document.documentElement.classList.add("reel");
@@ -50,7 +74,7 @@ export function toggleAspectRatioStyle(selectedRatioId) {
       document.documentElement.classList.add("scale");
     }
 
-    document.body.style = `
+    document.body.style.cssText = `
         width: ${ratio.width};
         height: ${ratio.height};
         position: relative;
@@ -62,7 +86,7 @@ export function toggleAspectRatioStyle(selectedRatioId) {
   dispatchResize();
 }
 
-export function setBg(colorId) {
+export function setBg(this: UiStyleContext, colorId: string): void {
   const color = this.settings.backgroundColors.find((c) => c.id === colorId);
   if (!color) {
     if (logger.debugEnabled) {
@@ -74,7 +98,7 @@ export function setBg(colorId) {
   const currentStyle = document.documentElement.style.filter;
   const hasHueRotate = currentStyle.includes("hue-rotate");
   const hueRotateValue = hasHueRotate
-    ? currentStyle.match(/hue-rotate\(([^)]+)\)/)[1]
+    ? currentStyle.match(/hue-rotate\(([^)]+)\)/)![1]
     : "";
 
   document.documentElement.style.backgroundColor = color.value;

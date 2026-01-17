@@ -1,8 +1,31 @@
 import logger from "../../helpers/logger";
-import { TrackSandboxHost } from "../sandbox/TrackSandboxHost.js";
-import { getMessaging } from "../bridge.js";
+import { TrackSandboxHost } from "../sandbox/TrackSandboxHost";
+import { getMessaging } from "../bridge";
 
-export async function previewModule(moduleName, moduleData, requestId = null) {
+type PreviewControllerContext = {
+  previewToken: number;
+  previewModuleName: unknown;
+  restoreTrackNameAfterPreview: unknown;
+
+  activeTrack: { name?: unknown } | null;
+  activeModules: Record<string, unknown>;
+  trackSandboxHost: { destroy?: () => unknown; token?: unknown; ensureSandbox?: () => Promise<unknown> | unknown; initTrack?: (args: unknown) => Promise<unknown>; invokeOnInstance?: (id: unknown, methodName: unknown, options: unknown) => Promise<unknown> } | null;
+  trackModuleSources: unknown;
+
+  loadWorkspaceModuleSource: (moduleName: unknown) => Promise<{ text?: unknown } | null>;
+  deactivateActiveTrack: () => unknown;
+  handleTrackSelection: (trackName: unknown) => unknown;
+  getAssetsBaseUrlForSandboxToken: (token: unknown) => string | null;
+
+  clearPreviewForModule: (moduleName: unknown) => unknown;
+};
+
+export async function previewModule(
+  this: PreviewControllerContext,
+  moduleName: unknown,
+  moduleData: unknown,
+  requestId: unknown = null
+) {
   const token = ++this.previewToken;
   const debugEnabled = logger.debugEnabled;
   if (debugEnabled) {
@@ -37,18 +60,19 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
     return;
   }
 
+  const moduleNameStr = String(moduleName);
   try {
     if (debugEnabled) {
-      logger.log(`🎨 [PREVIEW] Setting preview module name: ${moduleName}`);
+      logger.log(`🎨 [PREVIEW] Setting preview module name: ${moduleNameStr}`);
     }
     this.previewModuleName = moduleName;
-    const previewKey = `preview_${moduleName}`;
+    const previewKey = `preview_${moduleNameStr}`;
 
     const src = await this.loadWorkspaceModuleSource(moduleName);
     if (token !== this.previewToken) {
       return;
     }
-    const moduleSources = { [moduleName]: { text: src?.text || "" } };
+    const moduleSources = { [moduleNameStr]: { text: src?.text || "" } };
 
     if (this.activeTrack?.name) {
       this.restoreTrackNameAfterPreview = this.activeTrack.name;
@@ -79,12 +103,12 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
     if (!assetsBaseUrl) throw new Error("ASSETS_BASE_URL_UNAVAILABLE");
 
     const track = {
-      name: `preview:${moduleName}`,
-      modules: [{ id: previewKey, type: moduleName }],
+      name: `preview:${moduleNameStr}`,
+      modules: [{ id: previewKey, type: moduleNameStr }],
       modulesData: {
         [previewKey]: {
-          constructor: Array.isArray(moduleData?.constructor)
-            ? moduleData.constructor
+          constructor: Array.isArray((moduleData as { constructor?: unknown } | null)?.constructor)
+            ? (moduleData as { constructor: unknown[] }).constructor
             : [],
         },
       },
@@ -104,8 +128,12 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
       moduleSources,
       assetsBaseUrl,
     });
-    if (!res || res.ok !== true) {
-      throw new Error(res?.error || "SANDBOX_PREVIEW_INIT_FAILED");
+    if (!res || typeof res !== "object" || (res as { ok?: unknown }).ok !== true) {
+      throw new Error(
+        String(
+          (res as { error?: unknown } | null)?.error || "SANDBOX_PREVIEW_INIT_FAILED"
+        )
+      );
     }
     if (token !== this.previewToken) {
       this.clearPreviewForModule(moduleName);
@@ -121,7 +149,7 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
     }
 
     if (debugEnabled) {
-      logger.log(`✅✅✅ [PREVIEW] Preview active for: ${moduleName}`);
+      logger.log(`✅✅✅ [PREVIEW] Preview active for: ${moduleNameStr}`);
       logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     }
 
@@ -133,8 +161,11 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
       });
     }
   } catch (error) {
-    logger.error(`❌ [PREVIEW] Error instantiating module "${moduleName}":`, error);
-    logger.error(`❌ [PREVIEW] Error stack:`, error.stack);
+    logger.error(`❌ [PREVIEW] Error instantiating module "${moduleNameStr}":`, error);
+    logger.error(
+      `❌ [PREVIEW] Error stack:`,
+      (error as { stack?: unknown } | null)?.stack
+    );
 
     this.clearPreviewForModule(moduleName);
 
@@ -145,13 +176,13 @@ export async function previewModule(moduleName, moduleData, requestId = null) {
       messaging?.sendToDashboard?.("preview-module-error", {
         moduleName,
         requestId,
-        error: error?.message || "PREVIEW_FAILED",
+        error: (error as { message?: unknown } | null)?.message || "PREVIEW_FAILED",
       });
     }
   }
 }
 
-export function clearPreview() {
+export function clearPreview(this: PreviewControllerContext) {
   this.previewToken++;
   const debugEnabled = logger.debugEnabled;
   if (debugEnabled) logger.log(`🧹 [PREVIEW] clearPreview called`);
@@ -165,7 +196,7 @@ export function clearPreview() {
   this.clearPreviewForModule(moduleName);
 }
 
-export function clearPreviewForModule(moduleName) {
+export function clearPreviewForModule(this: PreviewControllerContext, moduleName: unknown) {
   const debugEnabled = logger.debugEnabled;
   if (debugEnabled) logger.log(`🧹 [PREVIEW] Clearing preview for: ${moduleName}`);
 
@@ -178,7 +209,7 @@ export function clearPreviewForModule(moduleName) {
     return;
   }
 
-  const previewKey = `preview_${moduleName}`;
+  const previewKey = `preview_${String(moduleName)}`;
   try {
     this.trackSandboxHost?.destroy?.();
   } catch {}
@@ -204,7 +235,12 @@ export function clearPreviewForModule(moduleName) {
   }
 }
 
-export async function triggerPreviewMethod(moduleName, methodName, options) {
+export async function triggerPreviewMethod(
+  this: PreviewControllerContext,
+  moduleName: unknown,
+  methodName: unknown,
+  options: unknown
+) {
   const debugEnabled = logger.debugEnabled;
   if (debugEnabled) {
     logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -220,14 +256,18 @@ export async function triggerPreviewMethod(moduleName, methodName, options) {
     return;
   }
 
-  const previewKey = `preview_${moduleName}`;
+  const previewKey = `preview_${String(moduleName)}`;
   const host = this.trackSandboxHost;
   if (!host) return;
 
   try {
-    const res = await host.invokeOnInstance(previewKey, methodName, options);
-    if (!res || res.ok !== true) {
-      throw new Error(res?.error || "SANDBOX_PREVIEW_INVOKE_FAILED");
+    const res = await host.invokeOnInstance?.(previewKey, methodName, options);
+    if (!res || typeof res !== "object" || (res as { ok?: unknown }).ok !== true) {
+      throw new Error(
+        String(
+          (res as { error?: unknown } | null)?.error || "SANDBOX_PREVIEW_INVOKE_FAILED"
+        )
+      );
     }
     if (debugEnabled) {
       logger.log(`✅✅✅ [PREVIEW] Method trigger completed`);
@@ -235,7 +275,10 @@ export async function triggerPreviewMethod(moduleName, methodName, options) {
     }
   } catch (error) {
     logger.error(`❌ [PREVIEW] Error triggering method "${methodName}":`, error);
-    logger.error(`❌ [PREVIEW] Error stack:`, error.stack);
+    logger.error(
+      `❌ [PREVIEW] Error stack:`,
+      (error as { stack?: unknown } | null)?.stack
+    );
     if (debugEnabled) logger.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   }
 }

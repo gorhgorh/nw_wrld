@@ -4,18 +4,33 @@ import { getActiveSetTracks, migrateToSets } from "../shared/utils/setUtils.ts";
 import { getProjectDir } from "../shared/utils/projectDir.ts";
 import logger from "./helpers/logger";
 
-import { getMessaging } from "./internal/bridge.js";
-import { queueDebugLog } from "./internal/debugLog.js";
-import { initDashboardIpc } from "./internal/ipcFromDashboard.js";
-import { initInputListener } from "./internal/inputListener.js";
-import { introspectModule } from "./internal/introspection.js";
-import { applyConfigSettings, setBg, toggleAspectRatioStyle } from "./internal/uiStyle.js";
-import { initWorkspaceModulesChangedListener } from "./internal/workspaceEvents.js";
-import { loadWorkspaceModuleSource } from "./internal/workspaceModules.js";
-import { previewModule, clearPreview, clearPreviewForModule, triggerPreviewMethod } from "./internal/preview/previewController.js";
-import { handleChannelMessage, buildChannelHandlerMap } from "./internal/track/channelDispatch.js";
-import { executeMethods } from "./internal/track/methodExecutor.js";
-import { deactivateActiveTrack, handleTrackSelection } from "./internal/track/trackLifecycle.js";
+import { getMessaging } from "./internal/bridge";
+import { queueDebugLog } from "./internal/debugLog";
+import { initDashboardIpc } from "./internal/ipcFromDashboard";
+import { initInputListener } from "./internal/inputListener";
+import { introspectModule } from "./internal/introspection";
+import {
+  applyConfigSettings,
+  setBg,
+  toggleAspectRatioStyle,
+} from "./internal/uiStyle";
+import { initWorkspaceModulesChangedListener } from "./internal/workspaceEvents";
+import { loadWorkspaceModuleSource } from "./internal/workspaceModules";
+import {
+  previewModule,
+  clearPreview,
+  clearPreviewForModule,
+  triggerPreviewMethod,
+} from "./internal/preview/previewController";
+import {
+  handleChannelMessage,
+  buildChannelHandlerMap,
+} from "./internal/track/channelDispatch";
+import { executeMethods } from "./internal/track/methodExecutor";
+import {
+  deactivateActiveTrack,
+  handleTrackSelection,
+} from "./internal/track/trackLifecycle.js";
 
 const Projector = {
   activeTrack: null,
@@ -42,22 +57,23 @@ const Projector = {
   debugLogTimeout: null,
   moduleIntrospectionCache: new Map(),
 
-  getAssetsBaseUrlForSandboxToken(token) {
+  getAssetsBaseUrlForSandboxToken(token: unknown) {
     const safe = String(token || "").trim();
     if (!safe) return null;
     return `nw-assets://app/${encodeURIComponent(safe)}/`;
   },
 
-  async loadWorkspaceModuleSource(moduleType) {
+  async loadWorkspaceModuleSource(moduleType: unknown) {
     return await loadWorkspaceModuleSource.call(this, moduleType);
   },
 
-  async loadModuleClass(moduleType) {
+  async loadModuleClass(moduleType: unknown) {
     return await this.loadWorkspaceModuleSource(moduleType);
   },
 
-  logToMain(message) {
-    const appBridge = globalThis.nwWrldAppBridge;
+  logToMain(message: unknown) {
+    const appBridge = (globalThis as typeof globalThis & { nwWrldAppBridge?: unknown })
+      .nwWrldAppBridge as { logToMain?: (message: unknown) => unknown } | undefined;
     if (!appBridge || typeof appBridge.logToMain !== "function") return;
     appBridge.logToMain(message);
   },
@@ -95,7 +111,7 @@ const Projector = {
     this.initInputListener();
   },
 
-  loadUserData(activeSetIdOverride = null) {
+  loadUserData(activeSetIdOverride: unknown = null) {
     const parsedData = loadJsonFileSync(
       "userData.json",
       { config: {}, sets: [] },
@@ -103,7 +119,7 @@ const Projector = {
     );
     const migratedData = migrateToSets(parsedData);
 
-    let activeSetId = null;
+    let activeSetId: unknown = null;
     if (activeSetIdOverride) {
       activeSetId = activeSetIdOverride;
     } else {
@@ -112,14 +128,33 @@ const Projector = {
         { activeSetId: null, workspacePath: null },
         "Could not load appState.json, initializing with defaults."
       );
-      activeSetId = appState?.activeSetId || null;
+      activeSetId = (appState as { activeSetId?: unknown } | null)?.activeSetId || null;
       const projectDir = getProjectDir();
-      this.workspacePath = projectDir || appState?.workspacePath || null;
+      this.workspacePath =
+        projectDir ||
+        (appState as { workspacePath?: unknown } | null)?.workspacePath ||
+        null;
     }
 
     this.userData = getActiveSetTracks(migratedData, activeSetId);
-    this.config = migratedData.config || {};
-    this.inputType = migratedData.config?.input?.type || "midi";
+    const config =
+      migratedData && typeof migratedData === "object" && "config" in migratedData
+        ? (migratedData as { config?: unknown }).config
+        : null;
+    this.config = config && typeof config === "object" ? config : {};
+    this.inputType =
+      this.config &&
+      typeof this.config === "object" &&
+      "input" in this.config &&
+      (this.config as { input?: unknown }).input &&
+      typeof (this.config as { input?: unknown }).input === "object" &&
+      "type" in ((this.config as { input?: unknown }).input as object)
+        ? String(
+            (
+              (this.config as { input?: unknown }).input as { type?: unknown }
+            ).type || ""
+          ) || "midi"
+        : "midi";
     if (logger.debugEnabled) {
       console.log(
         `✅ [Projector] Loaded ${this.userData.length} tracks from set: ${
@@ -135,3 +170,4 @@ const Projector = {
 };
 
 export default Projector;
+

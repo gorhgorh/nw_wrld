@@ -5,26 +5,49 @@ import {
   pitchClassToName,
 } from "../../shared/midi/midiUtils.ts";
 import logger from "../helpers/logger";
-import { getMessaging } from "./bridge.js";
+import { getMessaging } from "./bridge";
 
-export function initInputListener() {
+type InputEventPayload = {
+  type?: unknown;
+  data?: unknown;
+};
+
+type InputData = Record<string, unknown>;
+
+type InputListenerContext = {
+  config: Record<string, unknown> | null;
+  userData: unknown;
+  activeTrack: { name?: unknown } | null;
+  debugOverlayActive: boolean;
+  queueDebugLog: (log: string) => unknown;
+  handleTrackSelection: (trackName: unknown) => unknown;
+  handleChannelMessage: (channelPath: string, debugContext?: Record<string, unknown>) => unknown;
+};
+
+export function initInputListener(this: InputListenerContext) {
   const messaging = getMessaging();
   if (!messaging || typeof messaging.onInputEvent !== "function") return;
-  messaging.onInputEvent((event, payload) => {
-    const { type, data } = payload;
+  messaging.onInputEvent((event: unknown, payload: unknown) => {
+    const p =
+      payload && typeof payload === "object" ? (payload as InputEventPayload) : null;
+    if (!p) return;
+
+    const type = p.type;
+    const data = (p.data && typeof p.data === "object" ? (p.data as InputData) : {}) as InputData;
     const debugEnabled = logger.debugEnabled;
 
-    const isSequencerMode = this.config?.sequencerMode === true;
-    const selectedInputType = this.config?.input?.type || "midi";
-    const midiConfig = buildMidiConfig(
-      this.userData,
-      this.config,
-      selectedInputType
-    );
+    const config = this.config || {};
+    const isSequencerMode = (config as { sequencerMode?: unknown }).sequencerMode === true;
+    const selectedInputType =
+      (config as { input?: unknown }).input &&
+      typeof (config as { input?: unknown }).input === "object"
+        ? String(((config as { input?: unknown }).input as { type?: unknown }).type || "midi")
+        : "midi";
+    const midiConfig = buildMidiConfig(this.userData, config, selectedInputType);
     if (isSequencerMode) {
       return;
     }
-    if (data?.source && data.source !== selectedInputType) {
+    if (data.source && data.source !== selectedInputType) {
       return;
     }
 
@@ -33,18 +56,27 @@ export function initInputListener() {
       logger.log(`🎵 [INPUT] Event type: ${type}, source: ${data.source}`);
     }
 
-    let trackName = null;
-    const timestamp = data.timestamp || performance.now() / 1000;
-    const noteMatchMode = normalizeNoteMatchMode(this.config?.input?.noteMatchMode);
+    let trackName: unknown = null;
+    const timestamp =
+      (data as { timestamp?: unknown }).timestamp || performance.now() / 1000;
+    const noteMatchMode = normalizeNoteMatchMode(
+      (config as { input?: unknown }).input &&
+        typeof (config as { input?: unknown }).input === "object"
+        ? ((config as { input?: unknown }).input as { noteMatchMode?: unknown }).noteMatchMode
+        : undefined
+    );
 
     switch (type) {
       case "track-selection":
         if (debugEnabled) logger.log("🎯 [INPUT] Track selection event...");
 
         if (data.source === "midi") {
-          const key = noteNumberToTriggerKey(data.note, noteMatchMode);
+          const key = noteNumberToTriggerKey(
+            (data as { note?: unknown }).note,
+            noteMatchMode
+          );
           const trackNameFromNote =
-            key !== null ? midiConfig.trackTriggersMap[key] : null;
+            key !== null ? (midiConfig.trackTriggersMap as Record<string, unknown>)[String(key)] : null;
           if (debugEnabled) {
             logger.log(`🎯 [INPUT] Note ${data.note} maps to track:`, trackNameFromNote);
           }
@@ -61,7 +93,9 @@ export function initInputListener() {
             }
           }
         } else if (data.source === "osc") {
-          const trackNameFromIdentifier = midiConfig.trackTriggersMap[data.identifier];
+          const trackNameFromIdentifier = (midiConfig.trackTriggersMap as Record<string, unknown>)[
+            String((data as { identifier?: unknown }).identifier)
+          ];
           if (debugEnabled) {
             logger.log(
               `🎯 [INPUT] OSC address ${data.identifier} maps to track:`,
@@ -80,7 +114,10 @@ export function initInputListener() {
               logger.warn(
                 `⚠️ [INPUT] OSC address ${data.identifier} not mapped to any track`
               );
-              logger.log("📋 [INPUT] Available OSC mappings:", Object.keys(midiConfig.trackTriggersMap));
+              logger.log(
+                "📋 [INPUT] Available OSC mappings:",
+                Object.keys(midiConfig.trackTriggersMap as Record<string, unknown>)
+              );
             }
           }
         }
@@ -92,15 +129,24 @@ export function initInputListener() {
           logger.log("🎯 [INPUT] Current active track:", this.activeTrack?.name);
         }
 
-        let channelNames = [];
+        let channelNames: unknown[] = [];
         const activeTrackName = this.activeTrack?.name;
 
-        if (activeTrackName && midiConfig.channelMappings[activeTrackName]) {
-          const trackMappings = midiConfig.channelMappings[activeTrackName];
+        if (
+          activeTrackName &&
+          (midiConfig.channelMappings as Record<string, unknown>)[String(activeTrackName)]
+        ) {
+          const trackMappings = (midiConfig.channelMappings as Record<string, unknown>)[
+            String(activeTrackName)
+          ] as Record<string, unknown>;
 
           if (data.source === "midi") {
-            const key = noteNumberToTriggerKey(data.note, noteMatchMode);
-            const mappedChannels = key !== null ? trackMappings[key] : null;
+            const key = noteNumberToTriggerKey(
+              (data as { note?: unknown }).note,
+              noteMatchMode
+            );
+            const mappedChannels =
+              key !== null ? trackMappings[String(key)] : null;
             if (mappedChannels) {
               channelNames = Array.isArray(mappedChannels)
                 ? mappedChannels
@@ -110,7 +156,7 @@ export function initInputListener() {
               }
             }
           } else if (data.source === "osc") {
-            const mappedChannels = trackMappings[data.channelName];
+            const mappedChannels = trackMappings[String((data as { channelName?: unknown }).channelName)];
             if (mappedChannels) {
               channelNames = Array.isArray(mappedChannels)
                 ? mappedChannels
@@ -130,12 +176,14 @@ export function initInputListener() {
           trackName = activeTrackName;
           channelNames.forEach((channelName) => {
             if (debugEnabled) {
-              logger.log(`✅ [INPUT] Triggering ${channelName} on track "${activeTrackName}"`);
+              logger.log(
+                `✅ [INPUT] Triggering ${channelName} on track "${activeTrackName}"`
+              );
             }
             this.handleChannelMessage(`/Ableton/${channelName}`, {
-              note: data.note,
-              channel: data.channel,
-              velocity: data.velocity || 127,
+              note: (data as { note?: unknown }).note,
+              channel: (data as { channel?: unknown }).channel,
+              velocity: (data as { velocity?: unknown }).velocity || 127,
               timestamp,
               trackName,
               source: data.source,
@@ -154,23 +202,26 @@ export function initInputListener() {
     }
 
     if (this.debugOverlayActive && debugEnabled) {
-      const timeStr = timestamp.toFixed(5);
+      const timeStr = Number(timestamp).toFixed(5);
       const source = data.source === "midi" ? "MIDI" : "OSC";
       let log = `[${timeStr}] ${source} Event\n`;
       if (data.source === "midi") {
-        const key = noteNumberToTriggerKey(data.note, noteMatchMode);
+        const key = noteNumberToTriggerKey(
+          (data as { note?: unknown }).note,
+          noteMatchMode
+        );
         const pcName =
           noteMatchMode === "pitchClass" && key !== null ? pitchClassToName(key) : null;
-        log += `  Note: ${data.note}${
+        log += `  Note: ${(data as { note?: unknown }).note}${
           key !== null
             ? noteMatchMode === "pitchClass"
               ? ` (pitchClass: ${key} ${pcName || ""})`
               : ` (note: ${key})`
             : ""
         }\n`;
-        log += `  Channel: ${data.channel}\n`;
+        log += `  Channel: ${(data as { channel?: unknown }).channel}\n`;
       } else if (data.source === "osc") {
-        log += `  Address: ${data.address}\n`;
+        log += `  Address: ${(data as { address?: unknown }).address}\n`;
       }
       if (trackName) {
         log += `  Track: ${trackName}\n`;

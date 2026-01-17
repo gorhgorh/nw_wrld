@@ -1,7 +1,7 @@
 import { find, forEach, isEqual, isFunction } from "lodash";
 import logger from "../../helpers/logger";
-import { TrackSandboxHost } from "../sandbox/TrackSandboxHost.js";
-import { getMessaging } from "../bridge.js";
+import { TrackSandboxHost } from "../sandbox/TrackSandboxHost";
+import { getMessaging } from "../bridge";
 
 export function deactivateActiveTrack() {
   if (!this.activeTrack || this.isDeactivating) return;

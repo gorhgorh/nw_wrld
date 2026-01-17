@@ -1,13 +1,20 @@
-import { getBridge } from "../bridge.js";
+import { getBridge } from "../bridge";
+
+type EnsureSandboxOk = { ok: true; token: string };
+type EnsureSandboxErr = { ok: false; reason: string };
 
 export class TrackSandboxHost {
-  constructor(modulesContainer) {
+  modulesContainer: unknown;
+  token: string | null;
+  disposed: boolean;
+
+  constructor(modulesContainer: unknown) {
     this.modulesContainer = modulesContainer;
     this.token = null;
     this.disposed = false;
   }
 
-  async ensureSandbox() {
+  async ensureSandbox(): Promise<EnsureSandboxOk | EnsureSandboxErr> {
     if (this.disposed) {
       return { ok: false, reason: "DISPOSED" };
     }
@@ -17,25 +24,36 @@ export class TrackSandboxHost {
       throw new Error(`[Projector] Sandbox bridge is unavailable.`);
     }
     const res = await ensure();
-    const token = String(res?.token || "").trim();
-    if (!res || res.ok !== true || !token) {
-      throw new Error(res?.reason || "SANDBOX_ENSURE_FAILED");
+    const token = String((res as { token?: unknown } | null)?.token || "").trim();
+    if (!res || (res as { ok?: unknown }).ok !== true || !token) {
+      throw new Error(
+        ((res as { reason?: unknown } | null)?.reason as string) ||
+          "SANDBOX_ENSURE_FAILED"
+      );
     }
     this.token = token;
     return { ok: true, token };
   }
 
-  async request(type, props) {
+  async request(type: string, props: Record<string, unknown> | null) {
     await this.ensureSandbox();
     const bridge = getBridge();
     const req = bridge?.sandbox?.request;
     if (typeof req !== "function") {
       return { ok: false, error: "SANDBOX_BRIDGE_UNAVAILABLE" };
     }
-    return await req(this.token, type, props || {});
+    return await req(this.token as string, type, props || {});
   }
 
-  initTrack({ track, moduleSources, assetsBaseUrl }) {
+  initTrack({
+    track,
+    moduleSources,
+    assetsBaseUrl,
+  }: {
+    track: unknown;
+    moduleSources: unknown;
+    assetsBaseUrl: unknown;
+  }) {
     return this.request("initTrack", {
       track,
       moduleSources,
@@ -49,6 +67,12 @@ export class TrackSandboxHost {
     moduleSources,
     assetsBaseUrl,
     matrixOptions,
+  }: {
+    instanceId: unknown;
+    track: unknown;
+    moduleSources: unknown;
+    assetsBaseUrl: unknown;
+    matrixOptions: unknown;
   }) {
     return this.request("setMatrixForInstance", {
       instanceId,
@@ -59,7 +83,7 @@ export class TrackSandboxHost {
     });
   }
 
-  invokeOnInstance(instanceId, methodName, options) {
+  invokeOnInstance(instanceId: unknown, methodName: unknown, options: unknown) {
     return this.request("invokeOnInstance", {
       instanceId,
       methodName,
@@ -67,7 +91,7 @@ export class TrackSandboxHost {
     });
   }
 
-  introspectModule(moduleType, sourceText) {
+  introspectModule(moduleType: unknown, sourceText: unknown) {
     return this.request("introspectModule", { moduleType, sourceText });
   }
 
@@ -75,7 +99,7 @@ export class TrackSandboxHost {
     return this.request("destroyTrack", {});
   }
 
-  async destroy() {
+  async destroy(): Promise<void> {
     this.disposed = true;
     try {
       await getBridge()?.sandbox?.destroy?.();
