@@ -19,6 +19,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier . --write",
+    "all:ci": "npm run typecheck:all && npm run test:unit && npm run test:e2e && npm run lint",
     "format:check": "prettier . --check",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('release',{recursive:true,force:true});\"",
     "build:renderer": "npm run clean && npm run build:runtime && webpack --mode production",
