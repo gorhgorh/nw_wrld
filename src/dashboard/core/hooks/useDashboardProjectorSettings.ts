@@ -40,17 +40,13 @@ export const useDashboardProjectorSettings = ({
       const storedAspect = (cfg as Record<string, unknown>).aspectRatio;
       const nextAspectRaw = typeof storedAspect === "string" ? storedAspect : "";
       const nextAspect = !nextAspectRaw || nextAspectRaw === "landscape" ? "default" : nextAspectRaw;
-      if (nextAspect && nextAspect !== aspectRatio) {
-        setAspectRatio(String(nextAspect));
-      }
+      setAspectRatio(String(nextAspect));
 
       const storedBg = (cfg as Record<string, unknown>).bgColor;
       const nextBg = typeof storedBg === "string" && storedBg ? storedBg : "grey";
-      if (nextBg !== bgColor) {
-        setBgColor(String(nextBg));
-      }
+      setBgColor(String(nextBg));
     }
-  }, [userData, aspectRatio, bgColor]);
+  }, [userData]);
 
   useEffect(() => {
     updateUserData(setUserData, (draft) => {
