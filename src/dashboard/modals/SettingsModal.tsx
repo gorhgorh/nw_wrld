@@ -11,6 +11,7 @@ import {
 } from "../components/FormInputs";
 import { HelpIcon } from "../components/HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText.ts";
+import { AUDIO_DEFAULTS } from "../core/audio/audioTuning";
 
 const isValidHexColor = (value: string): boolean => /^#([0-9A-F]{3}){1,2}$/i.test(value);
 
@@ -574,19 +575,19 @@ export const SettingsModal = ({
                         ? inputConfig.audioThresholds
                         : null;
                     const thr = {
-                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : 0.18,
+                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : AUDIO_DEFAULTS.threshold,
                       medium:
                         typeof rawThr?.medium === "number" && Number.isFinite(rawThr.medium)
                           ? rawThr.medium
-                          : 0.18,
+                          : AUDIO_DEFAULTS.threshold,
                       high:
-                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : 0.01,
+                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : AUDIO_DEFAULTS.threshold,
                     };
                     const interval =
                       typeof inputConfig.audioMinIntervalMs === "number" &&
                       Number.isFinite(inputConfig.audioMinIntervalMs)
                         ? inputConfig.audioMinIntervalMs
-                        : 90;
+                        : AUDIO_DEFAULTS.minIntervalMs;
                     setInputConfig({
                       ...inputConfig,
                       type: "audio",
@@ -617,19 +618,19 @@ export const SettingsModal = ({
                         ? inputConfig.fileThresholds
                         : null;
                     const thr = {
-                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : 0.18,
+                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : AUDIO_DEFAULTS.threshold,
                       medium:
                         typeof rawThr?.medium === "number" && Number.isFinite(rawThr.medium)
                           ? rawThr.medium
-                          : 0.18,
+                          : AUDIO_DEFAULTS.threshold,
                       high:
-                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : 0.01,
+                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : AUDIO_DEFAULTS.threshold,
                     };
                     const interval =
                       typeof inputConfig.fileMinIntervalMs === "number" &&
                       Number.isFinite(inputConfig.fileMinIntervalMs)
                         ? inputConfig.fileMinIntervalMs
-                        : 90;
+                        : AUDIO_DEFAULTS.minIntervalMs;
                     setInputConfig({
                       ...inputConfig,
                       type: "file",
@@ -857,9 +858,9 @@ export const SettingsModal = ({
                             typeof inputConfig.audioMinIntervalMs === "number" &&
                             Number.isFinite(inputConfig.audioMinIntervalMs)
                               ? inputConfig.audioMinIntervalMs
-                              : 90
+                              : AUDIO_DEFAULTS.minIntervalMs
                           }
-                          fallback={90}
+                          fallback={AUDIO_DEFAULTS.minIntervalMs}
                           onCommit={(next: number) =>
                             setInputConfig({
                               ...inputConfig,
@@ -886,7 +887,7 @@ export const SettingsModal = ({
                             inputConfig.audioThresholds && typeof inputConfig.audioThresholds === "object"
                               ? inputConfig.audioThresholds[band]
                               : undefined;
-                          const th = typeof th0 === "number" && Number.isFinite(th0) ? Math.max(0, Math.min(1, th0)) : 0.18;
+                          const th = typeof th0 === "number" && Number.isFinite(th0) ? Math.max(0, Math.min(1, th0)) : AUDIO_DEFAULTS.threshold;
 
                           return (
                             <div key={band} className="grid grid-cols-[80px_1fr_110px] gap-2 items-center">
@@ -909,7 +910,7 @@ export const SettingsModal = ({
                                 <div className="text-[10px] opacity-50 mb-1">Threshold</div>
                                 <DraftFloatInput
                                   value={th}
-                                  fallback={0.18}
+                                  fallback={AUDIO_DEFAULTS.threshold}
                                   onCommit={(next: number) =>
                                     setInputConfig({
                                       ...inputConfig,
@@ -1001,9 +1002,9 @@ export const SettingsModal = ({
                             typeof inputConfig.fileMinIntervalMs === "number" &&
                             Number.isFinite(inputConfig.fileMinIntervalMs)
                               ? inputConfig.fileMinIntervalMs
-                              : 90
+                              : AUDIO_DEFAULTS.minIntervalMs
                           }
-                          fallback={90}
+                          fallback={AUDIO_DEFAULTS.minIntervalMs}
                           onCommit={(next: number) =>
                             setInputConfig({
                               ...inputConfig,
@@ -1036,7 +1037,7 @@ export const SettingsModal = ({
                           const th =
                             typeof th0 === "number" && Number.isFinite(th0)
                               ? Math.max(0, Math.min(1, th0))
-                              : 0.18;
+                              : AUDIO_DEFAULTS.threshold;
 
                           return (
                             <div key={band} className="grid grid-cols-[80px_1fr_110px] gap-2 items-center">
@@ -1059,7 +1060,7 @@ export const SettingsModal = ({
                                 <div className="text-[10px] opacity-50 mb-1">Threshold</div>
                                 <DraftFloatInput
                                   value={th}
-                                  fallback={0.18}
+                                  fallback={AUDIO_DEFAULTS.threshold}
                                   onCommit={(next: number) =>
                                     setInputConfig({
                                       ...inputConfig,

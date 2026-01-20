@@ -191,6 +191,16 @@ const Dashboard = () => {
       inputConfig && typeof inputConfig === "object" ? inputConfig.fileMinIntervalMs ?? null : null,
   });
 
+  const fileAudioIsPlayingRef = useRef(false);
+  const fileAudioPlayRef = useRef(() => Promise.resolve());
+  const fileAudioStopRef = useRef(() => Promise.resolve());
+
+  useEffect(() => {
+    fileAudioIsPlayingRef.current = Boolean(fileAudio.isPlaying);
+    fileAudioPlayRef.current = () => fileAudio.play();
+    fileAudioStopRef.current = () => fileAudio.stop();
+  }, [fileAudio]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.code !== "Space") return;
@@ -204,16 +214,16 @@ const Dashboard = () => {
       if (isTyping) return;
 
       e.preventDefault();
-      if (fileAudio.isPlaying) {
-        fileAudio.stop().catch(() => {});
+      if (fileAudioIsPlayingRef.current) {
+        fileAudioStopRef.current().catch(() => {});
       } else {
-        fileAudio.play().catch(() => {});
+        fileAudioPlayRef.current().catch(() => {});
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [fileAudio, isFileMode]);
+  }, [isFileMode]);
 
   useInputEvents({
     userData,

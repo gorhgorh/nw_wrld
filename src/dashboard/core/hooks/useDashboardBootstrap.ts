@@ -5,6 +5,7 @@ import { loadRecordingData } from "../../../shared/json/recordingUtils";
 import { loadAppState } from "../../../shared/json/appStateUtils";
 import { loadUserData } from "../utils";
 import { useIPCListener } from "./useIPC";
+import { AUDIO_DEFAULTS } from "../audio/audioTuning";
 
 type UseDashboardBootstrapArgs = {
   isInitialMountRef: { current: boolean };
@@ -92,8 +93,8 @@ export const useDashboardBootstrap = ({
       if (cfg && typeof cfg === 'object' && 'input' in cfg) {
         const cfgObj = cfg as Record<string, unknown>;
         const migrateBandThresholds = (thr: unknown) => {
-          const defaultThr = 0.18;
-          const defaultHighThr = 0.01;
+          const oldDefaultThr = 0.18;
+          const oldDefaultHighThr = 0.01;
           if (!thr || typeof thr !== "object") return thr;
           const t = thr as Record<string, unknown>;
           const low = t.low;
@@ -106,11 +107,10 @@ export const useDashboardBootstrap = ({
             Number.isFinite(medium) &&
             typeof high === "number" &&
             Number.isFinite(high) &&
-            low === defaultThr &&
-            medium === defaultThr &&
-            high === defaultThr
+            ((low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultThr) ||
+              (low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultHighThr))
           ) {
-            return { ...t, high: defaultHighThr };
+            return { ...t, low: AUDIO_DEFAULTS.threshold, medium: AUDIO_DEFAULTS.threshold, high: AUDIO_DEFAULTS.threshold };
           }
           return thr;
         };

@@ -137,7 +137,6 @@ test("File Upload config persists across relaunch and mock file emits input-even
     await dashboard.getByText("CLOSE", { exact: true }).click();
     await expect(dashboard.locator("#signal-file-upload")).toBeHidden();
 
-    // Spacebar should toggle file playback (same ergonomics as sequencer mode).
     const playToggle = dashboard.getByTestId("file-play-toggle");
     await expect(playToggle).toBeVisible();
     await expect(playToggle).toContainText("PLAY");

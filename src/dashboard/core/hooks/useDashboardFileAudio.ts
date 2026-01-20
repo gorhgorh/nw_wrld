@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readDebugFlag, readLocalStorageNumber } from "../utils/readDebugFlag";
+import { AUDIO_ANALYSER_CONFIG, AUDIO_BAND_CUTOFF_HZ, AUDIO_DEFAULTS, AUDIO_NORMALIZATION_CONFIG, AUDIO_TRIGGER_CONFIG } from "../audio/audioTuning";
 
 type Band = "low" | "medium" | "high";
 
@@ -19,8 +20,8 @@ const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 
 function bandForHz(hz: number): Band | null {
   if (!Number.isFinite(hz) || hz <= 0) return null;
-  if (hz < 200) return "low";
-  if (hz < 2000) return "medium";
+  if (hz < AUDIO_BAND_CUTOFF_HZ.lowMaxHz) return "low";
+  if (hz < AUDIO_BAND_CUTOFF_HZ.mediumMaxHz) return "medium";
   return "high";
 }
 
@@ -64,19 +65,31 @@ export function useDashboardFileAudio({
   const emitBandRef = useRef(emitBand);
   const assetRelPathRef = useRef<string | null>(assetRelPath);
   const runIdRef = useRef(0);
+  const thresholdsRef = useRef<Partial<Levels> | null | undefined>(thresholds);
+  const minIntervalMsRef = useRef<number | null | undefined>(minIntervalMs);
 
   const armedRef = useRef<Record<Band, boolean>>({ low: true, medium: true, high: true });
+  const peakWhileDisarmedRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
   const lastEmitMsRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
   const lastLevelsRef = useRef<Levels>({ low: 0, medium: 0, high: 0 });
   const lastPeaksDbRef = useRef<PeaksDb>({ low: -Infinity, medium: -Infinity, high: -Infinity });
   const lastBandRmsLinRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
   const bandRmsPeakRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
+  const bandRmsLongPeakRef = useRef<Record<Band, number>>({ low: 0, medium: 0, high: 0 });
   const lastLevelsUpdateMsRef = useRef(0);
   const debugRef = useRef(false);
 
   useEffect(() => {
     emitBandRef.current = emitBand;
   }, [emitBand]);
+
+  useEffect(() => {
+    thresholdsRef.current = thresholds;
+  }, [thresholds]);
+
+  useEffect(() => {
+    minIntervalMsRef.current = minIntervalMs;
+  }, [minIntervalMs]);
 
   useEffect(() => {
     assetRelPathRef.current = assetRelPath;
@@ -103,11 +116,13 @@ export function useDashboardFileAudio({
     }
     analyserRef.current = null;
     armedRef.current = { low: true, medium: true, high: true };
+    peakWhileDisarmedRef.current = { low: 0, medium: 0, high: 0 };
     lastEmitMsRef.current = { low: 0, medium: 0, high: 0 };
     lastLevelsRef.current = { low: 0, medium: 0, high: 0 };
     lastPeaksDbRef.current = { low: -Infinity, medium: -Infinity, high: -Infinity };
     lastBandRmsLinRef.current = { low: 0, medium: 0, high: 0 };
     bandRmsPeakRef.current = { low: 0, medium: 0, high: 0 };
+    bandRmsLongPeakRef.current = { low: 0, medium: 0, high: 0 };
     lastLevelsUpdateMsRef.current = 0;
 
     const nextAssetRelPath = assetRelPathRef.current;
@@ -144,8 +159,8 @@ export function useDashboardFileAudio({
     } catch {}
 
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.6;
+    analyser.fftSize = AUDIO_ANALYSER_CONFIG.fftSize;
+    analyser.smoothingTimeConstant = AUDIO_ANALYSER_CONFIG.smoothingTimeConstant;
     analyserRef.current = analyser;
 
     const src = ctx.createBufferSource();
@@ -155,19 +170,14 @@ export function useDashboardFileAudio({
     sourceRef.current = src;
 
     const bins = new Float32Array(analyser.frequencyBinCount);
-    const resolvedThresholds: Levels = {
-      low: typeof thresholds?.low === "number" && Number.isFinite(thresholds.low) ? thresholds.low : 0.18,
-      medium: typeof thresholds?.medium === "number" && Number.isFinite(thresholds.medium) ? thresholds.medium : 0.18,
-      high: typeof thresholds?.high === "number" && Number.isFinite(thresholds.high) ? thresholds.high : 0.01,
+    const getThreshold = (band: Band) => {
+      const t = thresholdsRef.current && typeof thresholdsRef.current === "object" ? thresholdsRef.current[band] : undefined;
+      return typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : AUDIO_DEFAULTS.threshold;
     };
-    const releaseRatio = 0.67;
-    const resolvedReleaseThresholds: Levels = {
-      low: resolvedThresholds.low * releaseRatio,
-      medium: resolvedThresholds.medium * releaseRatio,
-      high: resolvedThresholds.high * releaseRatio,
+    const getMinIntervalMs = () => {
+      const v = minIntervalMsRef.current;
+      return typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(10_000, v)) : AUDIO_DEFAULTS.minIntervalMs;
     };
-    const resolvedMinIntervalMs =
-      typeof minIntervalMs === "number" && Number.isFinite(minIntervalMs) ? minIntervalMs : 90;
 
     const gains: Record<Band, number> = {
       low: readLocalStorageNumber("nwWrld.fileAudio.gain.low", 6.0),
@@ -176,14 +186,22 @@ export function useDashboardFileAudio({
     };
 
     if (debugRef.current) {
+      const debugThresholds = { low: getThreshold("low"), medium: getThreshold("medium"), high: getThreshold("high") };
+      const releaseRatio = AUDIO_TRIGGER_CONFIG.releaseRatio;
+      const debugReleaseThresholds = {
+        low: debugThresholds.low * releaseRatio,
+        medium: debugThresholds.medium * releaseRatio,
+        high: debugThresholds.high * releaseRatio,
+      };
+      const debugMinIntervalMs = getMinIntervalMs();
       console.log("[FileAudioDebug] play", {
         assetRelPath,
         fftSize: analyser.fftSize,
         frequencyBinCount: analyser.frequencyBinCount,
         smoothingTimeConstant: analyser.smoothingTimeConstant,
-        thresholds: resolvedThresholds,
-        releaseThresholds: resolvedReleaseThresholds,
-        minIntervalMs: resolvedMinIntervalMs,
+        thresholds: debugThresholds,
+        releaseThresholds: debugReleaseThresholds,
+        minIntervalMs: debugMinIntervalMs,
         gains,
         sampleRate: ctx.sampleRate,
         durationSec: buf.duration,
@@ -223,26 +241,41 @@ export function useDashboardFileAudio({
       lastBandRmsLinRef.current = rmsLin;
 
       const now = Date.now();
+      const minInterval = getMinIntervalMs();
+      const releaseRatio = AUDIO_TRIGGER_CONFIG.releaseRatio;
       const maybeEmit = async (band: Band) => {
         const rawRms = lastBandRmsLinRef.current[band];
         const prevPeak = bandRmsPeakRef.current[band];
-        const nextPeak = Math.max(rawRms, prevPeak * 0.995);
+        const nextPeak = Math.max(rawRms, prevPeak * AUDIO_NORMALIZATION_CONFIG.shortPeakDecay);
         bandRmsPeakRef.current[band] = nextPeak;
-        const normalized = nextPeak > 1e-12 ? rawRms / nextPeak : 0;
+        const prevLongPeak = bandRmsLongPeakRef.current[band];
+        const nextLongPeak = Math.max(rawRms, prevLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakDecay);
+        bandRmsLongPeakRef.current[band] = nextLongPeak;
+        const absFloor = dbToLin(AUDIO_NORMALIZATION_CONFIG.absoluteDenomFloorDb);
+        const denom = Math.max(nextPeak, nextLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakFloorRatio, absFloor);
+        const normalized = denom > AUDIO_TRIGGER_CONFIG.minVelocityDenom ? rawRms / denom : 0;
         const gainRatio = DEFAULT_GAINS[band] > 0 ? gains[band] / DEFAULT_GAINS[band] : 1;
         const afterGain = normalized * gainRatio;
         const vel = clamp01(afterGain);
         lastLevelsRef.current[band] = vel;
-        const threshold = resolvedThresholds[band];
-        const releaseThreshold = resolvedReleaseThresholds[band];
-        if (vel < releaseThreshold) {
-          armedRef.current[band] = true;
+        const threshold = getThreshold(band);
+        const releaseThreshold = threshold * releaseRatio;
+        if (!armedRef.current[band]) {
+          peakWhileDisarmedRef.current[band] = Math.max(peakWhileDisarmedRef.current[band] || 0, vel);
+          const peakWhileDisarmed = peakWhileDisarmedRef.current[band] || 0;
+          if (
+            vel < releaseThreshold ||
+            (peakWhileDisarmed > 0 && vel < peakWhileDisarmed * AUDIO_TRIGGER_CONFIG.rearmOnDropRatio)
+          ) {
+            armedRef.current[band] = true;
+            peakWhileDisarmedRef.current[band] = 0;
+          }
           return;
         }
         if (vel < threshold) return;
-        if (!armedRef.current[band]) return;
-        if (now - lastEmitMsRef.current[band] < resolvedMinIntervalMs) return;
+        if (now - lastEmitMsRef.current[band] < minInterval) return;
         armedRef.current[band] = false;
+        peakWhileDisarmedRef.current[band] = vel;
         lastEmitMsRef.current[band] = now;
         if (debugRef.current) {
           console.log("[FileAudioDebug] emit", {
@@ -250,7 +283,7 @@ export function useDashboardFileAudio({
             velocity: vel,
             threshold,
             releaseThreshold,
-            minIntervalMs: resolvedMinIntervalMs,
+            minIntervalMs: minInterval,
             gain: gains[band],
             peaksDb: peaksDb[band],
           });
@@ -312,7 +345,7 @@ export function useDashboardFileAudio({
     rafRef.current = requestAnimationFrame(() => {
       tick().catch(() => {});
     });
-  }, [assetRelPath, enabled, minIntervalMs, negInf, stop, thresholds, zero]);
+  }, [assetRelPath, enabled, negInf, stop, zero]);
 
   useEffect(() => {
     if (!enabled) {
