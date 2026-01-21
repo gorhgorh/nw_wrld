@@ -1,28 +1,48 @@
-// src/helpers/threeBase.js
-
-/**
- * Important info: The `BaseThreeJsModule` class extends from `ModuleBase`.
- *
- * - `ModuleBase` provides essential lifecycle management for containers (HTML elements).
- *   It handles the initialization of the container, sets up transformation states (like position, scale, and opacity),
- *   and applies the necessary styles to prepare the element for manipulation.
- *
- * - In the constructor, it stores the reference to the container (`this.elem`) and initializes core properties such as
- *   `currentX`, `currentY`, `currentScale`, and `currentOpacity`. It also ensures that the element is hidden and has
- *   the correct opacity and transformation applied from the start. If an overlay image is required, this can be added
- *   later through the overlay method.
- *
- * - The `destroy` method ensures proper cleanup of the element by removing it from the DOM and any associated overlays.
- *   It also clears any references to the DOM element (`this.elem`), avoiding memory leaks and ensuring that the module
- *   is completely destroyed when no longer needed.
- */
-
-import ModuleBase from "./moduleBase"; // Ensure correct casing
-import * as THREE from "three"; // "three": "^0.159.0"
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import ModuleBase from "./moduleBase";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { animationManager } from "./animationManager";
 
 export class BaseThreeJsModule extends ModuleBase {
+  scene: THREE.Scene;
+  renderer: THREE.WebGLRenderer;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+
+  cameraSettings: {
+    zoomLevel: number;
+    viewDirection: "front" | "top" | "right" | "back" | "bottom" | "left";
+    cameraAnimation: string | null;
+    cameraSpeed: number;
+  };
+
+  currentAnimation: string | null;
+  animationSpeed: number;
+  animationDirection: number;
+
+  isInitialized: boolean;
+  customAnimate: (() => void) | null;
+  randomRotateDirection: THREE.Vector2;
+
+  model: THREE.Object3D | null;
+  modelBoundingBox: THREE.Box3 | null;
+  modelCenter: THREE.Vector3 | null;
+  modelSize: number;
+
+  displacement: {
+    enabled: boolean;
+    amplitude: number;
+    vector: THREE.Vector3;
+  };
+
+  displacementTime: { t: number; speed: number };
+
+  lastDisplacementNow: number | null;
+
+  animationFrameId: number | null;
+  intervalId: ReturnType<typeof setInterval> | null;
+  destroyed: boolean;
+
   static methods = [
     ...ModuleBase.methods,
     {
@@ -141,10 +161,9 @@ export class BaseThreeJsModule extends ModuleBase {
 
   ];
 
-  constructor(container) {
+  constructor(container: HTMLElement | null) {
     super(container);
 
-    // Bind methods early to ensure 'this' context is correct
     this.render = this.render.bind(this);
     this.animate = this.animate.bind(this);
     this.onWindowResize = this.onWindowResize.bind(this);
@@ -201,6 +220,10 @@ export class BaseThreeJsModule extends ModuleBase {
     // Initialize flag for animation loop
     this.isInitialized = false;
 
+    this.animationFrameId = null;
+    this.intervalId = null;
+    this.destroyed = false;
+
     // Placeholder for custom animation
     this.customAnimate = null;
 
@@ -213,10 +236,9 @@ export class BaseThreeJsModule extends ModuleBase {
       vector: new THREE.Vector3(1, 1, 1),
     };
 
-    // Local, monotonic time state used only for displacement interpolation (state B (displaced) → A)
     this.displacementTime = {
-      t: 0,        // accumulated time
-      speed: 1.0,  // higher = faster return from B back to A
+      t: 0,
+      speed: 1.0,
     };
 
     this.lastDisplacementNow = null;
@@ -977,7 +999,7 @@ export class BaseThreeJsModule extends ModuleBase {
         }
 
         // Nullify properties to help with garbage collection
-        for (let propName in object) {
+        for (const propName in object) {
           if (
             typeof object[propName] === "object" &&
             object[propName] !== null
@@ -985,7 +1007,7 @@ export class BaseThreeJsModule extends ModuleBase {
             object[propName] = null;
           }
         }
-      } catch (e) {
+      } catch {
         return;
       }
     };
@@ -1042,7 +1064,7 @@ export class BaseThreeJsModule extends ModuleBase {
     super.destroy();
 
     // Special case for properties not covered by standard removal
-    for (let propName in this) {
+    for (const propName in this) {
       if (this[propName] && typeof this[propName] === "object") {
         disposeObject(this[propName]);
         this[propName] = null;
