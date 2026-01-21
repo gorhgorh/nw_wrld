@@ -1,4 +1,4 @@
-import { WebMidi, type MidiInput, type NoteOnEvent } from "webmidi";
+import { WebMidi, type Input as WebMidiInput } from "webmidi";
 import { UDPPort, type OscMessage, type OscError } from "osc";
 import { isValidOSCChannelAddress, isValidOSCTrackAddress } from "../shared/validation/oscValidation";
 import { normalizeInputEventPayload } from "../shared/validation/inputEventValidation";
@@ -58,7 +58,7 @@ type WindowLike = {
 };
 
 type CurrentSource =
-  | { type: "midi"; instance: MidiInput }
+  | { type: "midi"; instance: WebMidiInput }
   | { type: "osc"; instance: UDPPort }
   | null;
 
@@ -69,8 +69,8 @@ type WebMidiProvider = {
   disable?: () => unknown;
   addListener?: (type: string, handler: (e: unknown) => void) => void;
   removeListener?: (type: string, handler: (e: unknown) => void) => void;
-  getInputById?: (id: string) => MidiInput | null;
-  getInputByName?: (name: string) => MidiInput | null;
+  getInputById?: (id: string) => WebMidiInput | null;
+  getInputByName?: (name: string) => WebMidiInput | null;
 };
 
 const getWebMidiProvider = () => {
@@ -304,10 +304,10 @@ class InputManager {
           const resolvedName = typeof input.name === "string" ? input.name : deviceName || "";
           this.installMidiWebMidiListeners(webMidi, resolvedId, resolvedName);
 
-          input.addListener("noteon", (e: NoteOnEvent) => {
+          input.addListener("noteon", (e) => {
             const note = e.note.number;
             const channel = e.message.channel;
-            const velocity = midiConfig.velocitySensitive ? e.velocity : 127;
+            const velocity = midiConfig.velocitySensitive ? e.note.rawAttack : 127;
 
             if (channel === midiConfig.trackSelectionChannel) {
               this.broadcast("track-selection", {
