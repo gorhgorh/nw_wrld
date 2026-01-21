@@ -34,6 +34,8 @@ export class BaseThreeJsModule extends ModuleBase {
           defaultVal: 75,
           type: "number",
           allowRandomization: true,
+          min: 0,
+          max: 150,
         },
       ],
     },
