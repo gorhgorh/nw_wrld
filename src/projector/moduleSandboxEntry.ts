@@ -1,5 +1,5 @@
 import ModuleBase from "./helpers/moduleBase";
-import BaseThreeJsModule from "./helpers/threeBase.js";
+import BaseThreeJsModule from "./helpers/threeBase";
 import * as THREE from "three";
 import p5 from "p5";
 import * as d3 from "d3";
