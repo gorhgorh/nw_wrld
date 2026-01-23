@@ -14,11 +14,11 @@ import { HelpIcon } from "../components/HelpIcon";
 import { MethodBlock } from "../components/MethodBlock";
 import { Tooltip } from "../components/Tooltip";
 import { FaExclamationTriangle } from "react-icons/fa";
-import { userDataAtom, selectedChannelAtom, activeSetIdAtom } from "../core/state.ts";
+import { userDataAtom, selectedChannelAtom, activeSetIdAtom } from "../core/state";
 import { updateActiveSet, getMethodsByLayer } from "../core/utils";
-import { getActiveSetTracks } from "../../shared/utils/setUtils.ts";
-import { getBaseMethodNames } from "../utils/moduleUtils.ts";
-import { HELP_TEXT } from "../../shared/helpText.ts";
+import { getActiveSetTracks } from "../../shared/utils/setUtils";
+import { getBaseMethodNames } from "../utils/moduleUtils";
+import { HELP_TEXT } from "../../shared/helpText";
 import { MethodCodeModal } from "./MethodCodeModal";
 
 type MethodOption = {
@@ -42,6 +42,7 @@ type OptionDef = {
   min?: number;
   max?: number;
   values?: string[];
+  allowRandomization?: boolean;
 };
 
 type _MethodDef = {
@@ -136,8 +137,15 @@ const SortableItem = memo(
           min = false;
           max = true;
         } else {
-          min = Math.max(defaultVal * 0.8, 0);
+          min = defaultVal * 0.8;
           max = defaultVal * 1.2;
+          if (typeof optionDef?.min === "number") min = Math.max(optionDef.min, min);
+          if (typeof optionDef?.max === "number") max = Math.min(optionDef.max, max);
+          if (typeof min === "number" && typeof max === "number" && min > max) {
+            const tmp = min;
+            min = max;
+            max = tmp;
+          }
         }
         changeOption(method.name, optionName, [min, max], "randomRange");
       },
@@ -193,7 +201,12 @@ const SortableItem = memo(
         } else {
           const current = option.randomRange as [number, number];
           newRandomRange = [...current] as [number, number];
-          newRandomRange[indexOrValues as number] = parseFloat(newValue);
+          const parsed = parseFloat(newValue);
+          if (!Number.isFinite(parsed)) return;
+          let next = parsed;
+          if (typeof optionDef?.min === "number") next = Math.max(optionDef.min, next);
+          if (typeof optionDef?.max === "number") next = Math.min(optionDef.max, next);
+          newRandomRange[indexOrValues as number] = next;
         }
         changeOption(method.name, optionName, newRandomRange, "randomRange");
       },
@@ -322,6 +335,7 @@ export const MethodConfiguratorModal = ({
               values,
               min: typeof oObj.min === "number" ? oObj.min : undefined,
               max: typeof oObj.max === "number" ? oObj.max : undefined,
+              allowRandomization: oObj.allowRandomization === true,
             };
           })
           .filter((o: OptionDef | null): o is OptionDef => Boolean(o));
@@ -357,6 +371,27 @@ export const MethodConfiguratorModal = ({
       : `Module "${selectedModuleType}" is not available in the current workspace scan.`;
 
   const [activeSetId] = useAtom(activeSetIdAtom);
+
+  const selectedTrackChannelCount = useMemo(() => {
+    const ch = selectedChannel as SelectedChannel | null;
+    if (!ch) return 0;
+    const tracks = getActiveSetTracks(userData, activeSetId);
+    const trackUnknown = tracks[ch.trackIndex];
+    if (!trackUnknown || typeof trackUnknown !== "object") return 0;
+    const track = trackUnknown as Record<string, unknown>;
+    const cmUnknown = track.channelMappings;
+    const cm =
+      cmUnknown && typeof cmUnknown === "object" && !Array.isArray(cmUnknown)
+        ? (cmUnknown as Record<string, unknown>)
+        : {};
+    const valid = Object.keys(cm).filter((k) => {
+      const n = parseInt(k, 10);
+      if (!Number.isFinite(n)) return false;
+      if (n < 1 || n > 12) return false;
+      return String(n) === k;
+    });
+    return valid.length;
+  }, [userData, activeSetId, selectedChannel]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -984,6 +1019,8 @@ export const MethodConfiguratorModal = ({
                 }}
                 type="secondary"
                 className="text-[11px]"
+                disabled={selectedTrackChannelCount <= 3}
+                title={selectedTrackChannelCount <= 3 ? "Minimum 3 channels required" : "Delete Channel"}
               >
                 DELETE CHANNEL
               </Button>
