@@ -62,7 +62,7 @@ type CurrentSource =
   | { type: "osc"; instance: UDPPort }
   | null;
 
-type WebMidiProvider = typeof WebMidi
+type WebMidiProvider = typeof WebMidi;
 
 const getWebMidiProvider = () => {
   const g = globalThis as unknown as { __nwWrldWebMidiOverride?: unknown };
@@ -263,10 +263,21 @@ class InputManager {
       const setupMIDI = () => {
         try {
           const webMidi = getWebMidiProvider();
-          const deviceId = midiConfig?.deviceId?.trim() || ""
-          const deviceName = midiConfig?.deviceName?.trim() || ""
+          const deviceId = midiConfig?.deviceId?.trim() || "";
+          const deviceName = midiConfig?.deviceName?.trim() || "";
 
-          const input = webMidi.getInputByName(deviceName) || webMidi.getInputById(deviceId)
+          let input: WebMidiInput | undefined;
+          try {
+            if (deviceId) {
+              input = webMidi.getInputById(deviceId) as unknown as WebMidiInput | undefined;
+            }
+          } catch {}
+          try {
+            if (!input && deviceName) {
+              input = webMidi.getInputByName(deviceName) as unknown as WebMidiInput | undefined;
+            }
+          } catch {}
+
           if (!input) {
             const error = new Error(
               `MIDI device "${midiConfig.deviceName}" not found`
@@ -277,14 +288,28 @@ class InputManager {
             return reject(error);
           }
 
-          const resolvedId = input.id ? deviceId : ''
-          const resolvedName = input.name ? deviceName : ""
+          const resolvedId = typeof (input as unknown as { id?: unknown }).id === "string"
+            ? ((input as unknown as { id: string }).id as string)
+            : deviceId;
+          const resolvedName = typeof (input as unknown as { name?: unknown }).name === "string"
+            ? ((input as unknown as { name: string }).name as string)
+            : deviceName;
           this.installMidiWebMidiListeners(webMidi, resolvedId, resolvedName);
 
           input.addListener("noteon", (e) => {
             const note = e.note.number;
             const channel = e.message.channel;
-            const velocity = midiConfig.velocitySensitive ? e.note.rawAttack : 127;
+            const rawAttack =
+              typeof e?.note?.rawAttack === "number" && Number.isFinite(e.note.rawAttack)
+                ? e.note.rawAttack
+                : typeof (e as unknown as { velocity?: unknown })?.velocity === "number" &&
+                    Number.isFinite((e as unknown as { velocity: number }).velocity)
+                  ? (e as unknown as { velocity: number }).velocity <= 1 &&
+                      (e as unknown as { velocity: number }).velocity >= 0
+                    ? Math.round((e as unknown as { velocity: number }).velocity * 127)
+                    : (e as unknown as { velocity: number }).velocity
+                  : 127;
+            const velocity = midiConfig.velocitySensitive ? rawAttack : 127;
 
             if (channel === midiConfig.trackSelectionChannel) {
               this.broadcast("track-selection", {
@@ -335,8 +360,8 @@ class InputManager {
             return reject(err);
           }
           setupMIDI();
-        }
-        webMidi.enable({callback});
+        };
+        webMidi.enable({ callback });
       }
     });
   }
@@ -473,9 +498,9 @@ class InputManager {
           manufacturer: input.manufacturer
         }));
         resolve(devices);
-      }
-      webMidi.enable({callback});
-    })
+      };
+      webMidi.enable({ callback });
+    });
   }
 }
 
