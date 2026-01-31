@@ -272,9 +272,9 @@ The included **Image** module demonstrates asset loading:
 
 ---
 
-## Advanced: Connect External MIDI/OSC
+## Advanced: Connect External MIDI/OSC/Audio
 
-Once you're comfortable with the sequencer, you can connect external hardware for live performance.
+Once you're comfortable with the sequencer, you can connect external hardware (or audio) for live performance.
 
 ### Prerequisites
 
@@ -294,9 +294,9 @@ Once you're comfortable with the sequencer, you can connect external hardware fo
 ### Switch to External Mode
 
 1. Open Dashboard → **Settings**
-2. **Signal Source** → Select **External (MIDI/OSC)**
-3. Configure your MIDI device or OSC port
-4. Go to **Settings → Configure Mappings** to customize trigger mappings (MIDI pitch classes / OSC addresses)
+2. **Signal Source** → Select **External MIDI**, **External OSC**, **External Audio (Low / Medium / High)**, or **File Upload (Low / Medium / High)**
+3. Configure your MIDI device / OSC port / audio input device
+4. Go to **Settings → Configure Mappings** to customize trigger mappings
 5. Your DAW now controls the visuals in real-time
 
 ### DAW Notes (Channel 1 Defaults + Best Practice)

@@ -5,6 +5,7 @@ import { loadRecordingData } from "../../../shared/json/recordingUtils";
 import { loadAppState } from "../../../shared/json/appStateUtils";
 import { loadUserData } from "../utils";
 import { useIPCListener } from "./useIPC";
+import { AUDIO_DEFAULTS } from "../audio/audioTuning";
 
 type UseDashboardBootstrapArgs = {
   isInitialMountRef: { current: boolean };
@@ -91,7 +92,38 @@ export const useDashboardBootstrap = ({
       const cfg = dataObj.config || null;
       if (cfg && typeof cfg === 'object' && 'input' in cfg) {
         const cfgObj = cfg as Record<string, unknown>;
-        setInputConfig(cfgObj.input && typeof cfgObj.input === 'object' ? cfgObj.input as Record<string, unknown> : {});
+        const migrateBandThresholds = (thr: unknown) => {
+          const oldDefaultThr = 0.18;
+          const oldDefaultHighThr = 0.01;
+          if (!thr || typeof thr !== "object") return thr;
+          const t = thr as Record<string, unknown>;
+          const low = t.low;
+          const medium = t.medium;
+          const high = t.high;
+          if (
+            typeof low === "number" &&
+            Number.isFinite(low) &&
+            typeof medium === "number" &&
+            Number.isFinite(medium) &&
+            typeof high === "number" &&
+            Number.isFinite(high) &&
+            ((low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultThr) ||
+              (low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultHighThr))
+          ) {
+            return { ...t, low: AUDIO_DEFAULTS.threshold, medium: AUDIO_DEFAULTS.threshold, high: AUDIO_DEFAULTS.threshold };
+          }
+          return thr;
+        };
+
+        const rawInput =
+          cfgObj.input && typeof cfgObj.input === "object" ? (cfgObj.input as Record<string, unknown>) : {};
+        const migratedAudio = migrateBandThresholds(rawInput.audioThresholds);
+        const migratedFile = migrateBandThresholds(rawInput.fileThresholds);
+        const nextInput =
+          migratedAudio !== rawInput.audioThresholds || migratedFile !== rawInput.fileThresholds
+            ? { ...rawInput, audioThresholds: migratedAudio, fileThresholds: migratedFile }
+            : rawInput;
+        setInputConfig(nextInput);
       }
 
       const tracks = getActiveSetTracks(data, activeSetIdToUse);

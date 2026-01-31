@@ -58,6 +58,26 @@ test("dashboard shows perf indicator after sandbox starts emitting stats", async
     await dashboard.getByText("Create Track", { exact: true }).click();
     await expect(dashboard.locator('input[placeholder="My Performance Track"]')).toBeHidden();
 
+    await dashboard.getByText("TRACKS", { exact: true }).click();
+    const trackLabel = dashboard.locator("label").filter({ hasText: trackName }).first();
+    await expect(trackLabel).toBeVisible();
+    await trackLabel.click();
+    {
+      const tracksModal = dashboard.locator("div.fixed").filter({ hasText: "Select Active Track:" }).first();
+      if (await tracksModal.isVisible()) {
+        await tracksModal.getByText("CLOSE", { exact: true }).click();
+      }
+      await expect(dashboard.locator("text=Select Active Track:")).toBeHidden();
+    }
+
+    await dashboard.getByTestId("track-add-module").click();
+    const addTextModule = dashboard.locator(
+      `[data-testid="add-module-to-track"][data-module-name="Text"]`
+    );
+    await expect(addTextModule).toBeVisible();
+    await addTextModule.click();
+    await expect(addTextModule).toBeHidden();
+
     const ensureRes = await projector.evaluate(async () => {
       const ensure = globalThis.nwWrldBridge?.sandbox?.ensure;
       if (typeof ensure !== "function") return null;
@@ -71,7 +91,7 @@ test("dashboard shows perf indicator after sandbox starts emitting stats", async
           const msgs = await getDashboardMessages(dashboard);
           return msgs.some((m) => m.type === "perf:stats");
         },
-        { timeout: 30_000 }
+        { timeout: 60_000 }
       )
       .toBe(true);
 

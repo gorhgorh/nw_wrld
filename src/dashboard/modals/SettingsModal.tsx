@@ -11,6 +11,7 @@ import {
 } from "../components/FormInputs";
 import { HelpIcon } from "../components/HelpIcon";
 import { HELP_TEXT } from "../../shared/helpText";
+import { AUDIO_DEFAULTS } from "../core/audio/audioTuning";
 
 const isValidHexColor = (value: string): boolean => /^#([0-9A-F]{3}){1,2}$/i.test(value);
 
@@ -84,6 +85,93 @@ const DraftIntInput = memo(({ value, fallback, onCommit, ...props }: DraftIntInp
       return;
     }
     const n = parseInt(s, 10);
+    if (!Number.isFinite(n)) {
+      onCommit(fallback);
+      return;
+    }
+    onCommit(n);
+  }, [draft, fallback, onCommit]);
+
+  return (
+    <NumberInput
+      {...props}
+      value={displayed}
+      onFocus={() => {
+        skipCommitRef.current = false;
+        setIsFocused(true);
+        setDraft(String(value ?? ""));
+      }}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        const next = e.target.value;
+        setDraft(next);
+        commitIfValid(next);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        if (skipCommitRef.current) {
+          skipCommitRef.current = false;
+          return;
+        }
+        commitOnBlur();
+      }}
+      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          skipCommitRef.current = true;
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+});
+
+type DraftFloatInputProps = {
+  value: number;
+  fallback: number;
+  onCommit: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  "data-testid"?: string;
+};
+
+const DraftFloatInput = memo(({ value, fallback, onCommit, ...props }: DraftFloatInputProps) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const skipCommitRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused) setDraft(null);
+  }, [isFocused, value]);
+
+  const displayed = draft !== null ? draft : String(value ?? "");
+
+  const commitIfValid = useCallback(
+    (raw: string) => {
+      const s = String(raw);
+      const isIntermediate =
+        s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
+      if (isIntermediate) return;
+      const n = parseFloat(s);
+      if (!Number.isFinite(n)) return;
+      onCommit(n);
+    },
+    [onCommit]
+  );
+
+  const commitOnBlur = useCallback(() => {
+    if (draft === null) return;
+    const s = String(draft);
+    const isIntermediate =
+      s === "" || s === "-" || s === "." || s === "-." || s.endsWith(".") || /e[+-]?$/i.test(s);
+    if (isIntermediate) {
+      onCommit(fallback);
+      return;
+    }
+    const n = parseFloat(s);
     if (!Number.isFinite(n)) {
       onCommit(fallback);
       return;
@@ -284,10 +372,21 @@ type MidiDevice = {
   name: string;
 };
 
+type AudioDevice = {
+  id: string;
+  label: string;
+};
+
 type InputConfig = {
   type?: string;
   deviceId?: string;
   deviceName?: string;
+  audioThresholds?: { low?: number; medium?: number; high?: number };
+  audioMinIntervalMs?: number;
+  fileAssetRelPath?: string;
+  fileAssetName?: string;
+  fileThresholds?: { low?: number; medium?: number; high?: number };
+  fileMinIntervalMs?: number;
   methodTriggerChannel?: number;
   trackSelectionChannel?: number;
   noteMatchMode?: string;
@@ -314,6 +413,20 @@ type SettingsModalProps = {
   inputConfig: InputConfig;
   setInputConfig: (config: InputConfig) => void;
   availableMidiDevices: MidiDevice[];
+  availableAudioDevices: AudioDevice[];
+  refreshAudioDevices: () => Promise<void>;
+  audioCaptureState:
+    | { status: "idle"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "starting"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "running"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "error"; message: string; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> }
+    | { status: "mock"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number> };
+  fileAudioState:
+    | { status: "idle"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number>; assetRelPath: string | null }
+    | { status: "loading"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number>; assetRelPath: string | null }
+    | { status: "ready"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number>; assetRelPath: string | null; durationSec: number }
+    | { status: "playing"; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number>; assetRelPath: string | null; durationSec: number }
+    | { status: "error"; message: string; levels: Record<"low" | "medium" | "high", number>; peaksDb: Record<"low" | "medium" | "high", number>; assetRelPath: string | null };
   onOpenMappings: () => void;
   config: Config;
   updateConfig: (updates: Partial<Config>) => void;
@@ -332,18 +445,74 @@ export const SettingsModal = ({
   inputConfig,
   setInputConfig,
   availableMidiDevices,
+  availableAudioDevices,
+  refreshAudioDevices,
+  audioCaptureState,
+  fileAudioState,
   onOpenMappings,
   config,
   updateConfig,
   workspacePath,
   onSelectWorkspace,
 }: SettingsModalProps) => {
-  const normalizedInputType = inputConfig?.type === "osc" ? "osc" : "midi";
+  const normalizedInputType =
+    inputConfig?.type === "osc"
+      ? "osc"
+      : inputConfig?.type === "audio"
+        ? "audio"
+        : inputConfig?.type === "file"
+          ? "file"
+          : "midi";
   const signalSourceValue = config.sequencerMode
     ? "sequencer"
     : normalizedInputType === "osc"
       ? "external-osc"
-      : "external-midi";
+      : normalizedInputType === "audio"
+        ? "external-audio"
+        : normalizedInputType === "file"
+          ? "file-upload"
+        : "external-midi";
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+  const uploadFileToAssets = useCallback(
+    async (file: File) => {
+      setFileUploadError(null);
+      const bridge = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge;
+      const bridgeObj = bridge && typeof bridge === "object" ? (bridge as Record<string, unknown>) : null;
+      const workspace = bridgeObj && typeof bridgeObj.workspace === "object" ? (bridgeObj.workspace as Record<string, unknown>) : null;
+      const write =
+        workspace && typeof workspace.writeAudioAsset === "function"
+          ? (workspace.writeAudioAsset as (payload: unknown) => Promise<unknown>)
+          : null;
+      if (!write) {
+        setFileUploadError("Upload not available.");
+        return;
+      }
+      try {
+        const bytes = await file.arrayBuffer();
+        const res = await write({ filename: file.name, bytes });
+        const r = res && typeof res === "object" ? (res as Record<string, unknown>) : null;
+        const ok = Boolean(r && r.ok === true);
+        const relPath = r && typeof r.relPath === "string" ? r.relPath : "";
+        if (!ok || !relPath) {
+          const reason = r && typeof r.reason === "string" ? r.reason : "";
+          setFileUploadError(reason ? `Upload failed: ${reason}` : "Upload failed.");
+          return;
+        }
+        setInputConfig({
+          ...inputConfig,
+          fileAssetRelPath: relPath,
+          fileAssetName: file.name,
+        });
+        setFileUploadError(null);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setFileUploadError(message || "Upload failed.");
+      }
+    },
+    [inputConfig, setInputConfig]
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -406,6 +575,90 @@ export const SettingsModal = ({
                   className="cursor-pointer text-[11px] font-mono text-neutral-300"
                 >
                   External OSC
+                </label>
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="signal-external-audio"
+                  name="signalSource"
+                  value="external-audio"
+                  checked={signalSourceValue === "external-audio"}
+                  onChange={() => {
+                    updateConfig({ sequencerMode: false });
+                    const rawThr =
+                      inputConfig.audioThresholds && typeof inputConfig.audioThresholds === "object"
+                        ? inputConfig.audioThresholds
+                        : null;
+                    const thr = {
+                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : AUDIO_DEFAULTS.threshold,
+                      medium:
+                        typeof rawThr?.medium === "number" && Number.isFinite(rawThr.medium)
+                          ? rawThr.medium
+                          : AUDIO_DEFAULTS.threshold,
+                      high:
+                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : AUDIO_DEFAULTS.threshold,
+                    };
+                    const interval =
+                      typeof inputConfig.audioMinIntervalMs === "number" &&
+                      Number.isFinite(inputConfig.audioMinIntervalMs)
+                        ? inputConfig.audioMinIntervalMs
+                        : AUDIO_DEFAULTS.minIntervalMs;
+                    setInputConfig({
+                      ...inputConfig,
+                      type: "audio",
+                      deviceId: "",
+                      deviceName: "",
+                      audioThresholds: thr,
+                      audioMinIntervalMs: interval,
+                    });
+                  }}
+                />
+                <label
+                  htmlFor="signal-external-audio"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  External Audio (Low / Medium / High)
+                </label>
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="signal-file-upload"
+                  name="signalSource"
+                  value="file-upload"
+                  checked={signalSourceValue === "file-upload"}
+                  onChange={() => {
+                    updateConfig({ sequencerMode: false });
+                    const rawThr =
+                      inputConfig.fileThresholds && typeof inputConfig.fileThresholds === "object"
+                        ? inputConfig.fileThresholds
+                        : null;
+                    const thr = {
+                      low: typeof rawThr?.low === "number" && Number.isFinite(rawThr.low) ? rawThr.low : AUDIO_DEFAULTS.threshold,
+                      medium:
+                        typeof rawThr?.medium === "number" && Number.isFinite(rawThr.medium)
+                          ? rawThr.medium
+                          : AUDIO_DEFAULTS.threshold,
+                      high:
+                        typeof rawThr?.high === "number" && Number.isFinite(rawThr.high) ? rawThr.high : AUDIO_DEFAULTS.threshold,
+                    };
+                    const interval =
+                      typeof inputConfig.fileMinIntervalMs === "number" &&
+                      Number.isFinite(inputConfig.fileMinIntervalMs)
+                        ? inputConfig.fileMinIntervalMs
+                        : AUDIO_DEFAULTS.minIntervalMs;
+                    setInputConfig({
+                      ...inputConfig,
+                      type: "file",
+                      fileThresholds: thr,
+                      fileMinIntervalMs: interval,
+                    });
+                  }}
+                />
+                <label
+                  htmlFor="signal-file-upload"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  File Upload (Low / Medium / High)
                 </label>
               </div>
             </div>
@@ -561,6 +814,291 @@ export const SettingsModal = ({
                   <div className="pl-12">
                     <div className="text-[10px] opacity-50">
                       Send OSC to: localhost:{inputConfig.port}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {normalizedInputType === "audio" && (
+                <>
+                  <div className="pl-12">
+                    <div className="opacity-50 mb-1 text-[11px]">Audio Input Device:</div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        id="audioDevice"
+                        value={typeof inputConfig.deviceId === "string" ? inputConfig.deviceId : ""}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+                          const nextDeviceId = e.target.value;
+                          const selected = availableAudioDevices.find((d) => d.id === nextDeviceId);
+                          setInputConfig({
+                            ...inputConfig,
+                            deviceId: nextDeviceId,
+                            deviceName: selected?.label || "",
+                          });
+                        }}
+                        className="py-1 w-full"
+                      >
+                        <option value="" className="bg-[#101010]">
+                          Default device
+                        </option>
+                        {availableAudioDevices.map((device) => (
+                          <option key={device.id} value={device.id} className="bg-[#101010]">
+                            {device.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        onClick={() => {
+                          refreshAudioDevices().catch(() => {});
+                        }}
+                        className="px-3"
+                      >
+                        REFRESH
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="pl-12">
+                    <div className="text-[10px] opacity-50">
+                      Status:{" "}
+                      {audioCaptureState.status === "error"
+                        ? `Error: ${audioCaptureState.message}`
+                        : audioCaptureState.status}
+                    </div>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div>
+                        <div className="text-[10px] opacity-50 mb-1">Trigger Cooldown (ms)</div>
+                        <DraftIntInput
+                          value={
+                            typeof inputConfig.audioMinIntervalMs === "number" &&
+                            Number.isFinite(inputConfig.audioMinIntervalMs)
+                              ? inputConfig.audioMinIntervalMs
+                              : AUDIO_DEFAULTS.minIntervalMs
+                          }
+                          fallback={AUDIO_DEFAULTS.minIntervalMs}
+                          onCommit={(next: number) =>
+                            setInputConfig({
+                              ...inputConfig,
+                              audioMinIntervalMs: Math.max(0, Math.min(10_000, next)),
+                            })
+                          }
+                          step={10}
+                          min={0}
+                          max={10_000}
+                          className="py-1 w-full"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {(["low", "medium", "high"] as const).map((band) => {
+                          const v0 = audioCaptureState.levels?.[band];
+                          const v = typeof v0 === "number" && Number.isFinite(v0) ? Math.max(0, Math.min(1, v0)) : 0;
+                          const pct = Math.round(v * 100);
+
+                          const db0 = audioCaptureState.peaksDb?.[band];
+                          const db = typeof db0 === "number" && Number.isFinite(db0) ? db0 : -Infinity;
+
+                          const th0 =
+                            inputConfig.audioThresholds && typeof inputConfig.audioThresholds === "object"
+                              ? inputConfig.audioThresholds[band]
+                              : undefined;
+                          const th = typeof th0 === "number" && Number.isFinite(th0) ? Math.max(0, Math.min(1, th0)) : AUDIO_DEFAULTS.threshold;
+
+                          return (
+                            <div key={band} className="grid grid-cols-[80px_1fr_110px] gap-2 items-center">
+                              <div>
+                                <div className="text-[10px] opacity-50">{band.toUpperCase()}</div>
+                                <div className="text-[10px] text-neutral-400">
+                                  {v.toFixed(2)} / {db === -Infinity ? "--" : `${db.toFixed(1)} dB`}
+                                </div>
+                              </div>
+
+                              <div className="h-2 w-full bg-neutral-800 rounded relative">
+                                <div className="h-2 bg-green-500 rounded" style={{ width: `${pct}%` }} />
+                                <div
+                                  className="absolute top-0 h-2 w-[2px] bg-white/40"
+                                  style={{ left: `${Math.round(th * 100)}%` }}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="text-[10px] opacity-50 mb-1">Threshold</div>
+                                <DraftFloatInput
+                                  value={th}
+                                  fallback={AUDIO_DEFAULTS.threshold}
+                                  onCommit={(next: number) =>
+                                    setInputConfig({
+                                      ...inputConfig,
+                                      audioThresholds: {
+                                        ...(inputConfig.audioThresholds || {}),
+                                        [band]: Math.max(0, Math.min(1, next)),
+                                      },
+                                    })
+                                  }
+                                  step={0.01}
+                                  min={0}
+                                  max={1}
+                                  className="py-1 w-full"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-[10px] opacity-50">
+                      For system audio, use a loopback/virtual device and select it here.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {normalizedInputType === "file" && (
+                <>
+                  <div className="pl-12">
+                    <div className="opacity-50 mb-1 text-[11px]">Audio File (MP3/WAV):</div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".mp3,.wav"
+                      data-testid="file-upload-input"
+                      style={{ display: "none" }}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        const f = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                        if (f) {
+                          uploadFileToAssets(f).catch(() => {});
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() => {
+                          fileInputRef.current?.click();
+                        }}
+                        className="px-3"
+                      >
+                        UPLOAD
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setInputConfig({
+                            ...inputConfig,
+                            fileAssetRelPath: "",
+                            fileAssetName: "",
+                          });
+                          setFileUploadError(null);
+                        }}
+                        className="px-3"
+                      >
+                        CLEAR
+                      </Button>
+                    </div>
+                    <div className="mt-2 text-[10px] text-neutral-400">
+                      {inputConfig.fileAssetName
+                        ? inputConfig.fileAssetName
+                        : inputConfig.fileAssetRelPath
+                          ? String(inputConfig.fileAssetRelPath)
+                          : "No file selected"}
+                    </div>
+                  </div>
+
+                  <div className="pl-12">
+                    <div className="text-[10px] opacity-50">
+                      Status:{" "}
+                      {fileAudioState.status === "error"
+                        ? `Error: ${fileAudioState.message}`
+                        : fileAudioState.status}
+                    </div>
+                    {fileUploadError && (
+                      <div className="text-[10px] text-red-400 mt-1">Upload: {fileUploadError}</div>
+                    )}
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div>
+                        <div className="text-[10px] opacity-50 mb-1">Trigger Cooldown (ms)</div>
+                        <DraftIntInput
+                          value={
+                            typeof inputConfig.fileMinIntervalMs === "number" &&
+                            Number.isFinite(inputConfig.fileMinIntervalMs)
+                              ? inputConfig.fileMinIntervalMs
+                              : AUDIO_DEFAULTS.minIntervalMs
+                          }
+                          fallback={AUDIO_DEFAULTS.minIntervalMs}
+                          onCommit={(next: number) =>
+                            setInputConfig({
+                              ...inputConfig,
+                              fileMinIntervalMs: Math.max(0, Math.min(10_000, next)),
+                            })
+                          }
+                          step={10}
+                          min={0}
+                          max={10_000}
+                          className="py-1 w-full"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {(["low", "medium", "high"] as const).map((band) => {
+                          const v0 = fileAudioState.levels?.[band];
+                          const v =
+                            typeof v0 === "number" && Number.isFinite(v0)
+                              ? Math.max(0, Math.min(1, v0))
+                              : 0;
+                          const pct = Math.round(v * 100);
+
+                          const db0 = fileAudioState.peaksDb?.[band];
+                          const db = typeof db0 === "number" && Number.isFinite(db0) ? db0 : -Infinity;
+
+                          const th0 =
+                            inputConfig.fileThresholds && typeof inputConfig.fileThresholds === "object"
+                              ? inputConfig.fileThresholds[band]
+                              : undefined;
+                          const th =
+                            typeof th0 === "number" && Number.isFinite(th0)
+                              ? Math.max(0, Math.min(1, th0))
+                              : AUDIO_DEFAULTS.threshold;
+
+                          return (
+                            <div key={band} className="grid grid-cols-[80px_1fr_110px] gap-2 items-center">
+                              <div>
+                                <div className="text-[10px] opacity-50">{band.toUpperCase()}</div>
+                                <div className="text-[10px] text-neutral-400">
+                                  {v.toFixed(2)} / {db === -Infinity ? "--" : `${db.toFixed(1)} dB`}
+                                </div>
+                              </div>
+
+                              <div className="h-2 w-full bg-neutral-800 rounded relative">
+                                <div className="h-2 bg-green-500 rounded" style={{ width: `${pct}%` }} />
+                                <div
+                                  className="absolute top-0 h-2 w-[2px] bg-white/40"
+                                  style={{ left: `${Math.round(th * 100)}%` }}
+                                />
+                              </div>
+
+                              <div>
+                                <div className="text-[10px] opacity-50 mb-1">Threshold</div>
+                                <DraftFloatInput
+                                  value={th}
+                                  fallback={AUDIO_DEFAULTS.threshold}
+                                  onCommit={(next: number) =>
+                                    setInputConfig({
+                                      ...inputConfig,
+                                      fileThresholds: {
+                                        ...(inputConfig.fileThresholds || {}),
+                                        [band]: Math.max(0, Math.min(1, next)),
+                                      },
+                                    })
+                                  }
+                                  step={0.01}
+                                  min={0}
+                                  max={1}
+                                  className="py-1 w-full"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </>

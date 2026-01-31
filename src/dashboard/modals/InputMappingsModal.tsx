@@ -8,7 +8,7 @@ import { updateUserData } from "../core/utils";
 import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig";
 import { parsePitchClass, pitchClassToName } from "../../shared/midi/midiUtils";
 
-type ActiveTab = "midi-pitchClass" | "midi-exactNote" | "osc";
+type ActiveTab = "midi-pitchClass" | "midi-exactNote" | "osc" | "audio" | "file";
 
 type InputMappingsModalProps = {
   isOpen: boolean;
@@ -38,6 +38,10 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
     const nextTab: ActiveTab =
       inputType === "osc"
         ? "osc"
+        : inputType === "audio"
+          ? "audio"
+          : inputType === "file"
+            ? "file"
         : noteMatchMode === "exactNote"
           ? "midi-exactNote"
           : "midi-pitchClass";
@@ -48,6 +52,7 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
   const trackMappings = (cfg?.trackMappings as Record<string, unknown>) || {};
   const channelMappings = (cfg?.channelMappings as Record<string, unknown>) || {};
   const isMidi = activeTab.startsWith("midi-");
+  const isAudioOrFile = activeTab === "audio" || activeTab === "file";
   const midiMode = activeTab === "midi-exactNote" ? "exactNote" : "pitchClass";
   const trackSlots = isMidi ? 12 : 10;
   const triggerSlots = 12;
@@ -170,8 +175,16 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
         }
         (m[midiMode] as Record<string, unknown>)[String(slot)] = value;
       } else {
-        if (!tm.osc) tm.osc = {};
-        (tm.osc as Record<string, unknown>)[String(slot)] = value;
+        if (activeTab === "osc") {
+          if (!tm.osc) tm.osc = {};
+          (tm.osc as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "audio") {
+          if (!tm.audio) tm.audio = {};
+          (tm.audio as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "file") {
+          if (!tm.file) tm.file = {};
+          (tm.file as Record<string, unknown>)[String(slot)] = value;
+        }
       }
     });
   };
@@ -202,8 +215,16 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
         }
         (m[midiMode] as Record<string, unknown>)[String(slot)] = value;
       } else {
-        if (!cm.osc) cm.osc = {};
-        (cm.osc as Record<string, unknown>)[String(slot)] = value;
+        if (activeTab === "osc") {
+          if (!cm.osc) cm.osc = {};
+          (cm.osc as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "audio") {
+          if (!cm.audio) cm.audio = {};
+          (cm.audio as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "file") {
+          if (!cm.file) cm.file = {};
+          (cm.file as Record<string, unknown>)[String(slot)] = value;
+        }
       }
     });
   };
@@ -219,6 +240,12 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
     value: n,
     label: String(n),
   }));
+
+  const audioBandOptions = [
+    { value: "low", label: "low" },
+    { value: "medium", label: "medium" },
+    { value: "high", label: "high" },
+  ];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="large">
@@ -271,6 +298,36 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
                 className="cursor-pointer text-[11px] font-mono text-neutral-300"
               >
                 OSC
+              </label>
+            </div>
+            <div className="flex items-center gap-3 py-1">
+              <RadioButton
+                id="input-mappings-audio"
+                name="input-mappings-tab"
+                value="audio"
+                checked={activeTab === "audio"}
+                onChange={() => setActiveTab("audio")}
+              />
+              <label
+                htmlFor="input-mappings-audio"
+                className="cursor-pointer text-[11px] font-mono text-neutral-300"
+              >
+                Audio (Low / Medium / High)
+              </label>
+            </div>
+            <div className="flex items-center gap-3 py-1">
+              <RadioButton
+                id="input-mappings-file"
+                name="input-mappings-tab"
+                value="file"
+                checked={activeTab === "file"}
+                onChange={() => setActiveTab("file")}
+              />
+              <label
+                htmlFor="input-mappings-file"
+                className="cursor-pointer text-[11px] font-mono text-neutral-300"
+              >
+                File Upload (Low / Medium / High)
               </label>
             </div>
           </div>
@@ -337,97 +394,132 @@ export const InputMappingsModal = ({ isOpen, onClose }: InputMappingsModalProps)
                       </Select>
                     )
                   ) : (
-                    <TextInput
-                      value={String(
-                        ((channelMappings as Record<string, unknown>).osc as Record<string, unknown> | undefined)?.[
-                          String(slot)
-                        ] ?? ""
-                      )}
-                      onChange={(e) => updateChannelMapping(slot, e.target.value)}
-                      className="flex-1 text-[11px]"
-                      placeholder={`/ch/${slot}`}
-                    />
+                    activeTab === "audio" || activeTab === "file" ? (
+                      <Select
+                        value={(() => {
+                          const cmBand = (channelMappings as Record<string, unknown>)[activeTab] as
+                            | Record<string, unknown>
+                            | undefined;
+                          const raw = cmBand?.[String(slot)];
+                          const v = typeof raw === "string" ? raw : "";
+                          return v === "low" || v === "medium" || v === "high" ? v : "";
+                        })()}
+                        onChange={(e) => updateChannelMapping(slot, e.target.value)}
+                        className="flex-1 text-[11px]"
+                      >
+                        <option value="">—</option>
+                        {audioBandOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <TextInput
+                        value={String(
+                          ((channelMappings as Record<string, unknown>).osc as
+                            | Record<string, unknown>
+                            | undefined)?.[String(slot)] ?? ""
+                        )}
+                        onChange={(e) => updateChannelMapping(slot, e.target.value)}
+                        className="flex-1 text-[11px]"
+                        placeholder={`/ch/${slot}`}
+                      />
+                    )
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div>
-            <div className="text-neutral-300 text-[11px] mb-3 font-mono">
-              Track Select Mappings (1-{trackSlots}):
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: trackSlots }, (_, i) => i + 1).map((slot) => (
-                <div key={slot} className="flex items-center gap-2">
-                  <span className="text-neutral-500 text-[11px] font-mono w-12">Track {slot}:</span>
-                  {isMidi ? (
-                    midiMode === "pitchClass" ? (
-                      <Select
-                        value={(() => {
-                          const tmMidi = (trackMappings as Record<string, unknown>).midi as Record<string, unknown> | undefined;
-                          const pitchMap = tmMidi?.pitchClass as Record<string, unknown> | undefined;
-                          const current = pitchMap?.[String(slot)] ?? tmMidi?.[String(slot)];
-                          if (typeof current === "number") return String(current);
-                          const pc = parsePitchClass(current);
-                          return pc === null ? "" : String(pc);
-                        })()}
-                        onChange={(e) => updateTrackMapping(slot, parseInt(e.target.value, 10))}
-                        className="flex-1 text-[11px]"
-                      >
-                        <option value="" disabled>
-                          select pitch class…
-                        </option>
-                        {pitchClassOptions.map((opt) => (
-                          <option key={opt.value} value={String(opt.value)}>
-                            {opt.label}
+          {!isAudioOrFile && (
+            <div>
+              <div className="text-neutral-300 text-[11px] mb-3 font-mono">
+                Track Select Mappings (1-{trackSlots}):
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {Array.from({ length: trackSlots }, (_, i) => i + 1).map((slot) => (
+                  <div key={slot} className="flex items-center gap-2">
+                    <span className="text-neutral-500 text-[11px] font-mono w-12">Track {slot}:</span>
+                    {isMidi ? (
+                      midiMode === "pitchClass" ? (
+                        <Select
+                          value={(() => {
+                            const tmMidi =
+                              (trackMappings as Record<string, unknown>).midi as
+                                | Record<string, unknown>
+                                | undefined;
+                            const pitchMap = tmMidi?.pitchClass as Record<string, unknown> | undefined;
+                            const current = pitchMap?.[String(slot)] ?? tmMidi?.[String(slot)];
+                            if (typeof current === "number") return String(current);
+                            const pc = parsePitchClass(current);
+                            return pc === null ? "" : String(pc);
+                          })()}
+                          onChange={(e) => updateTrackMapping(slot, parseInt(e.target.value, 10))}
+                          className="flex-1 text-[11px]"
+                        >
+                          <option value="" disabled>
+                            select pitch class…
                           </option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <Select
-                        value={(() => {
-                          const tmMidi = (trackMappings as Record<string, unknown>).midi as Record<string, unknown> | undefined;
-                          const exactMap = tmMidi?.exactNote as Record<string, unknown> | undefined;
-                          const current = exactMap?.[String(slot)];
-                          return isValidMidiNoteNumber(current) ? String(current) : "0";
-                        })()}
-                        onChange={(e) => updateTrackMapping(slot, parseInt(e.target.value, 10))}
-                        className="flex-1 text-[11px]"
-                      >
-                        {exactNoteOptions.map((opt) => {
-                          const tmMidi = (trackMappings as Record<string, unknown>).midi as Record<string, unknown> | undefined;
-                          const exactMap = (tmMidi?.exactNote as Record<string, unknown> | undefined) || undefined;
-                          const selected = exactMap?.[String(slot)];
-                          const usedByOtherSlot = Object.entries(exactMap || {}).some(([s, v]) => {
-                            if (parseInt(s, 10) === slot) return false;
-                            return v === opt.value;
-                          });
-                          const disabled = usedByOtherSlot && opt.value !== selected;
-                          return (
-                            <option key={opt.value} value={String(opt.value)} disabled={disabled}>
+                          {pitchClassOptions.map((opt) => (
+                            <option key={opt.value} value={String(opt.value)}>
                               {opt.label}
                             </option>
-                          );
-                        })}
-                      </Select>
-                    )
-                  ) : (
-                    <TextInput
-                      value={String(
-                        ((trackMappings as Record<string, unknown>).osc as Record<string, unknown> | undefined)?.[
-                          String(slot)
-                        ] ?? ""
-                      )}
-                      onChange={(e) => updateTrackMapping(slot, e.target.value)}
-                      className="flex-1 text-[11px]"
-                      placeholder={`/track/${slot}`}
-                    />
-                  )}
-                </div>
-              ))}
+                          ))}
+                        </Select>
+                      ) : (
+                        <Select
+                          value={(() => {
+                            const tmMidi =
+                              (trackMappings as Record<string, unknown>).midi as
+                                | Record<string, unknown>
+                                | undefined;
+                            const exactMap = tmMidi?.exactNote as Record<string, unknown> | undefined;
+                            const current = exactMap?.[String(slot)];
+                            return isValidMidiNoteNumber(current) ? String(current) : "0";
+                          })()}
+                          onChange={(e) => updateTrackMapping(slot, parseInt(e.target.value, 10))}
+                          className="flex-1 text-[11px]"
+                        >
+                          {exactNoteOptions.map((opt) => {
+                            const tmMidi =
+                              (trackMappings as Record<string, unknown>).midi as
+                                | Record<string, unknown>
+                                | undefined;
+                            const exactMap =
+                              (tmMidi?.exactNote as Record<string, unknown> | undefined) ||
+                              undefined;
+                            const selected = exactMap?.[String(slot)];
+                            const usedByOtherSlot = Object.entries(exactMap || {}).some(([s, v]) => {
+                              if (parseInt(s, 10) === slot) return false;
+                              return v === opt.value;
+                            });
+                            const disabled = usedByOtherSlot && opt.value !== selected;
+                            return (
+                              <option key={opt.value} value={String(opt.value)} disabled={disabled}>
+                                {opt.label}
+                              </option>
+                            );
+                          })}
+                        </Select>
+                      )
+                    ) : (
+                      <TextInput
+                        value={String(
+                          ((trackMappings as Record<string, unknown>).osc as
+                            | Record<string, unknown>
+                            | undefined)?.[String(slot)] ?? ""
+                        )}
+                        onChange={(e) => updateTrackMapping(slot, e.target.value)}
+                        className="flex-1 text-[11px]"
+                        placeholder={`/track/${slot}`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="text-neutral-500 text-[10px] font-mono border-t border-neutral-800 pt-4">

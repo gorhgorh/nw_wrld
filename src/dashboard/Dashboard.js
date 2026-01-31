@@ -31,6 +31,9 @@ import { useDashboardProjectorSettings } from "./core/hooks/useDashboardProjecto
 import { useDashboardInputConfiguration } from "./core/hooks/useDashboardInputConfiguration";
 import { useWorkspaceModuleIntrospectionDrain } from "./core/hooks/useWorkspaceModuleIntrospectionDrain";
 import { useDashboardUpdateConfig } from "./core/hooks/useDashboardUpdateConfig";
+import { useDashboardAudioDevices } from "./core/hooks/useDashboardAudioDevices";
+import { useDashboardAudioCapture } from "./core/hooks/useDashboardAudioCapture";
+import { useDashboardFileAudio } from "./core/hooks/useDashboardFileAudio";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const Dashboard = () => {
@@ -150,6 +153,77 @@ const Dashboard = () => {
       invokeIPC,
       sendToProjector,
     });
+
+  const isAudioMode = inputConfig?.type === "audio" && userData?.config?.sequencerMode !== true;
+  const isFileMode = inputConfig?.type === "file" && userData?.config?.sequencerMode !== true;
+  const { devices: availableAudioDevices, refresh: refreshAudioDevices } = useDashboardAudioDevices(
+    Boolean(isAudioMode)
+  );
+  const emitAudioBand = useCallback(
+    async (payload) => invokeIPC("input:audio:emitBand", payload),
+    [invokeIPC]
+  );
+  const emitFileBand = useCallback(
+    async (payload) => invokeIPC("input:file:emitBand", payload),
+    [invokeIPC]
+  );
+  const audioCaptureState = useDashboardAudioCapture({
+    enabled: Boolean(isAudioMode),
+    deviceId:
+      typeof inputConfig?.deviceId === "string" && inputConfig.deviceId ? inputConfig.deviceId : null,
+    emitBand: emitAudioBand,
+    thresholds:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.audioThresholds || null : null,
+    minIntervalMs:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.audioMinIntervalMs ?? null : null,
+  });
+
+  const fileAudio = useDashboardFileAudio({
+    enabled: Boolean(isFileMode),
+    assetRelPath:
+      inputConfig && typeof inputConfig === "object" && typeof inputConfig.fileAssetRelPath === "string" && inputConfig.fileAssetRelPath
+        ? inputConfig.fileAssetRelPath
+        : null,
+    emitBand: emitFileBand,
+    thresholds:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.fileThresholds || null : null,
+    minIntervalMs:
+      inputConfig && typeof inputConfig === "object" ? inputConfig.fileMinIntervalMs ?? null : null,
+  });
+
+  const fileAudioIsPlayingRef = useRef(false);
+  const fileAudioPlayRef = useRef(() => Promise.resolve());
+  const fileAudioStopRef = useRef(() => Promise.resolve());
+
+  useEffect(() => {
+    fileAudioIsPlayingRef.current = Boolean(fileAudio.isPlaying);
+    fileAudioPlayRef.current = () => fileAudio.play();
+    fileAudioStopRef.current = () => fileAudio.stop();
+  }, [fileAudio]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code !== "Space") return;
+      if (!isFileMode) return;
+
+      const target = e.target;
+      const isTyping =
+        (target && target.tagName === "INPUT") ||
+        (target && target.tagName === "TEXTAREA") ||
+        (target && target.isContentEditable);
+      if (isTyping) return;
+
+      e.preventDefault();
+      if (fileAudioIsPlayingRef.current) {
+        fileAudioStopRef.current().catch(() => {});
+      } else {
+        fileAudioPlayRef.current().catch(() => {});
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFileMode]);
 
   useInputEvents({
     userData,
@@ -329,12 +403,26 @@ const Dashboard = () => {
         isPlaying={
           userData.config.sequencerMode
             ? isSequencerPlaying
-            : firstVisibleTrack
-              ? footerPlaybackState[firstVisibleTrack.track.id] || false
-              : false
+            : inputConfig?.type === "file"
+              ? fileAudio.isPlaying
+              : firstVisibleTrack
+                ? footerPlaybackState[firstVisibleTrack.track.id] || false
+                : false
         }
-        onPlayPause={handleFooterPlayPause}
-        onStop={handleFooterStop}
+        onPlayPause={
+          userData.config.sequencerMode
+            ? handleFooterPlayPause
+            : inputConfig?.type === "file"
+              ? fileAudio.play
+              : handleFooterPlayPause
+        }
+        onStop={
+          userData.config.sequencerMode
+            ? handleFooterStop
+            : inputConfig?.type === "file"
+              ? fileAudio.stop
+              : handleFooterStop
+        }
         inputStatus={inputStatus}
         inputConfig={inputConfig}
         config={userData.config}
@@ -376,6 +464,10 @@ const Dashboard = () => {
         inputConfig={inputConfig}
         setInputConfig={setInputConfig}
         availableMidiDevices={availableMidiDevices}
+        availableAudioDevices={availableAudioDevices}
+        refreshAudioDevices={refreshAudioDevices}
+        audioCaptureState={audioCaptureState}
+        fileAudioState={fileAudio.state}
         settings={settings}
         aspectRatio={aspectRatio}
         setAspectRatio={setAspectRatio}

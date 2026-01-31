@@ -55,6 +55,8 @@
     "src/main/mainProcess/ipcBridge/registerOsBridge.ts",
     "src/main/mainProcess/ipcBridge/registerInputBridge.ts",
     "src/main/mainProcess/ipcBridge/registerTestMidiBridge.ts",
+    "src/main/mainProcess/ipcBridge/registerTestAudioBridge.ts",
+    "src/main/mainProcess/ipcBridge/registerTestFileBridge.ts",
     "src/main/mainProcess/ipcBridge/registerLogBridge.ts",
     "src/main/mainProcess/sandbox.ts",
     "src/main/mainProcess/entry.ts",

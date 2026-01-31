@@ -12,12 +12,14 @@ import { EditChannelModal } from "../modals/EditChannelModal";
 import { ConfirmationModal } from "../modals/ConfirmationModal";
 import { ModuleEditorModal } from "./ModuleEditorModal";
 import { NewModuleDialog } from "./NewModuleDialog";
+import type { FileAudioState } from "../core/hooks/useDashboardFileAudio";
 
 type Confirmation = { message: string; onConfirm?: () => void; type?: "confirm" | "alert" } | null;
 
 type UserData = Parameters<typeof SelectSetModal>[0]["userData"];
 type ProjectorSettings = Parameters<typeof SettingsModal>[0]["settings"];
 type PredefinedModules = Parameters<typeof AddModuleModal>[0]["predefinedModules"];
+type AudioCaptureState = Parameters<typeof SettingsModal>[0]["audioCaptureState"];
 
 type DashboardModalLayerProps = {
   isCreateTrackOpen: boolean;
@@ -55,6 +57,10 @@ type DashboardModalLayerProps = {
   inputConfig: Record<string, unknown>;
   setInputConfig: (config: Record<string, unknown>) => void;
   availableMidiDevices: Array<{ id: string; name: string }>;
+  availableAudioDevices: Array<{ id: string; label: string }>;
+  refreshAudioDevices: () => Promise<void>;
+  audioCaptureState: AudioCaptureState;
+  fileAudioState: FileAudioState;
   settings: ProjectorSettings;
   aspectRatio: string;
   setAspectRatio: (ratio: string) => void;
@@ -133,6 +139,10 @@ export const DashboardModalLayer = ({
   inputConfig,
   setInputConfig,
   availableMidiDevices,
+  availableAudioDevices,
+  refreshAudioDevices,
+  audioCaptureState,
+  fileAudioState,
   settings,
   aspectRatio,
   setAspectRatio,
@@ -226,6 +236,10 @@ export const DashboardModalLayer = ({
         inputConfig={inputConfig}
         setInputConfig={setInputConfig}
         availableMidiDevices={availableMidiDevices}
+        availableAudioDevices={availableAudioDevices}
+        refreshAudioDevices={refreshAudioDevices}
+        audioCaptureState={audioCaptureState}
+        fileAudioState={fileAudioState}
         onOpenMappings={() => {
           setIsSettingsModalOpen(false);
           setIsInputMappingsModalOpen(true);
