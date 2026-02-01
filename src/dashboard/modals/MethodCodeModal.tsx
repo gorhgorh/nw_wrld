@@ -10,7 +10,12 @@ type MethodCodeModalProps = {
   methodName: string | null | undefined;
 };
 
-export const MethodCodeModal = ({ isOpen, onClose, moduleName, methodName }: MethodCodeModalProps) => {
+export const MethodCodeModal = ({
+  isOpen,
+  onClose,
+  moduleName,
+  methodName,
+}: MethodCodeModalProps) => {
   const [methodCode, setMethodCode] = useState<string | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,32 +43,33 @@ export const MethodCodeModal = ({ isOpen, onClose, moduleName, methodName }: Met
     <Modal isOpen={isOpen} onClose={onClose} size="large">
       <ModalHeader title={`METHOD: ${methodName?.toUpperCase() || ""}`} onClose={onClose} />
 
-      {loading ? (
-        <div className="text-neutral-300/50 text-[11px]">Loading...</div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {filePath && (
-            <div>
-              <div className="text-neutral-300/50 text-[10px] mb-1">File Path:</div>
-              <div className="text-neutral-300 text-[11px] font-mono">{filePath}</div>
-            </div>
-          )}
+      <div className="px-6">
+        {loading ? (
+          <div className="opacity-50 text-[11px] font-mono">Loading...</div>
+        ) : (
+          <div className="flex flex-col gap-2 font-mono">
+            {filePath && (
+              <div>
+                <div className="opacity-50 text-[11px] mb-1">File Path:</div>
+                <div className="text-neutral-300 text-[11px]">{filePath}</div>
+              </div>
+            )}
 
-          {methodCode ? (
-            <div>
-              <div className="text-neutral-300/50 text-[10px] mb-1">Method Code:</div>
-              <pre className="p-4 border border-neutral-800 overflow-x-auto text-[10px] text-neutral-300 font-mono max-h-[400px] overflow-y-auto">
-                <code>{methodCode}</code>
-              </pre>
-            </div>
-          ) : (
-            <div className="text-neutral-300/50 text-[11px]">
-              Method code not found or method is inherited from base class.
-            </div>
-          )}
-        </div>
-      )}
+            {methodCode ? (
+              <div>
+                <div className="opacity-50 text-[11px] mb-1">Method Code:</div>
+                <pre className="p-4 border border-neutral-800 overflow-x-auto text-[10px] text-neutral-300 max-h-[400px] overflow-y-auto">
+                  <code>{methodCode}</code>
+                </pre>
+              </div>
+            ) : (
+              <div className="opacity-50 text-[11px]">
+                Method code not found or method is inherited from base class.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 };
-

@@ -146,56 +146,64 @@ export const ReleaseNotesModal = ({ isOpen, onClose }: ReleaseNotesModalProps) =
   }, [isOpen, repoInfo?.owner, repoInfo?.repo]);
 
   const releasesPageUrl =
-    repoInfo?.owner && repoInfo?.repo ? `https://github.com/${repoInfo.owner}/${repoInfo.repo}/releases` : null;
+    repoInfo?.owner && repoInfo?.repo
+      ? `https://github.com/${repoInfo.owner}/${repoInfo.repo}/releases`
+      : null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="large">
       <ModalHeader title="RELEASES" onClose={onClose} />
 
-      <div className="flex flex-col gap-4">
-        <div className="text-neutral-300/70">
-          Current version: <span className="text-neutral-300">{currentVersion || "unknown"}</span>
-        </div>
-
-        {status === "loading" ? (
-          <div className="text-neutral-300/30 text-[11px]">Loading releases…</div>
-        ) : status === "error" ? (
-          <div className="text-neutral-300/30 text-[11px]">Failed to load releases.</div>
-        ) : releases.length === 0 ? (
-          <div className="text-neutral-300/30 text-[11px]">No releases found.</div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {releases.map((r) => (
-              <div key={r.id} className="border border-neutral-800 bg-[#101010] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="text-neutral-300">
-                      <span className="opacity-50">{r.prerelease ? "[PRE] " : ""}</span>
-                      {r.tag}
-                      {r.name ? <span className="opacity-50"> — {r.name}</span> : null}
-                    </div>
-                    <div className="text-[10px] text-neutral-500">
-                      {r.publishedAt ? `Published: ${formatDate(r.publishedAt)}` : ""}
-                    </div>
-                  </div>
-                  <Button onClick={() => openExternal(r.url)}>OPEN</Button>
-                </div>
-
-                {r.body ? (
-                  <div className="mt-3 whitespace-pre-wrap text-neutral-300/70">{r.body}</div>
-                ) : (
-                  <div className="mt-3 text-neutral-300/30">No notes.</div>
-                )}
-              </div>
-            ))}
+      <div className="px-6">
+        <div className="flex flex-col gap-2 font-mono">
+          <div>
+            <div className="opacity-50 text-[11px] mb-1">Current Version</div>
+            <div className="text-neutral-300 text-[11px]">{currentVersion || "unknown"}</div>
           </div>
-        )}
+
+          {status === "loading" ? (
+            <div className="opacity-50 text-[11px]">Loading releases…</div>
+          ) : status === "error" ? (
+            <div className="opacity-50 text-[11px]">Failed to load releases.</div>
+          ) : releases.length === 0 ? (
+            <div className="opacity-50 text-[11px]">No releases found.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {releases.map((r) => (
+                <div key={r.id} className="border border-neutral-800 bg-[#101010] p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="text-neutral-300 text-[11px]">
+                        <span className="opacity-50">{r.prerelease ? "[PRE] " : ""}</span>
+                        {r.tag}
+                        {r.name ? <span className="opacity-50"> — {r.name}</span> : null}
+                      </div>
+                      <div className="text-[10px] text-neutral-500">
+                        {r.publishedAt ? `Published: ${formatDate(r.publishedAt)}` : ""}
+                      </div>
+                    </div>
+                    <Button onClick={() => openExternal(r.url)}>OPEN</Button>
+                  </div>
+
+                  {r.body ? (
+                    <div className="mt-3 whitespace-pre-wrap text-neutral-300/70 text-[11px]">
+                      {r.body}
+                    </div>
+                  ) : (
+                    <div className="mt-3 opacity-50 text-[11px]">No notes.</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <ModalFooter>
-        {releasesPageUrl ? <Button onClick={() => openExternal(releasesPageUrl)}>OPEN RELEASES PAGE</Button> : null}
+        {releasesPageUrl ? (
+          <Button onClick={() => openExternal(releasesPageUrl)}>OPEN RELEASES PAGE</Button>
+        ) : null}
       </ModalFooter>
     </Modal>
   );
 };
-

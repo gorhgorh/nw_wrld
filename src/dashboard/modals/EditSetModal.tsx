@@ -4,7 +4,7 @@ import { Modal } from "../shared/Modal";
 import { ModalHeader } from "../components/ModalHeader";
 import { ModalFooter } from "../components/ModalFooter";
 import { Button } from "../components/Button";
-import { TextInput, Label, ValidationError } from "../components/FormInputs";
+import { TextInput, ValidationError } from "../components/FormInputs";
 import { userDataAtom } from "../core/state";
 import { updateUserData } from "../core/utils";
 import { useNameValidation } from "../core/hooks/useNameValidation";
@@ -75,21 +75,23 @@ export const EditSetModal = ({ isOpen, onClose, setId, onAlert }: EditSetModalPr
     <Modal isOpen={isOpen} onClose={onClose}>
       <ModalHeader title="EDIT SET" onClose={onClose} />
 
-      <div className="px-6 flex flex-col gap-4">
-        <div>
-          <Label>Set Name</Label>
-          <TextInput
-            value={setName}
-            onChange={(e) => setSetName(e.target.value)}
-            placeholder="Enter set name"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && canSubmit) {
-                handleSubmit();
-              }
-            }}
-          />
-          <ValidationError value={setName} validation={validation} />
+      <div className="px-6">
+        <div className="flex flex-col gap-2 font-mono">
+          <div>
+            <div className="opacity-50 text-[11px] mb-1">Set Name</div>
+            <TextInput
+              value={setName}
+              onChange={(e) => setSetName(e.target.value)}
+              placeholder="Enter set name"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) {
+                  handleSubmit();
+                }
+              }}
+            />
+            <ValidationError value={setName} validation={validation} />
+          </div>
         </div>
       </div>
 
@@ -104,4 +106,3 @@ export const EditSetModal = ({ isOpen, onClose, setId, onAlert }: EditSetModalPr
     </Modal>
   );
 };
-

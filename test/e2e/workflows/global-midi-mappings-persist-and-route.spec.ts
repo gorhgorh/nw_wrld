@@ -124,7 +124,7 @@ test("global MIDI mappings persist to userData.json and route input-event correc
 
     const mappingsModal = dashboard.locator("div.fixed").filter({ hasText: "INPUT MAPPINGS" }).first();
     await expect(mappingsModal).toBeVisible();
-    await mappingsModal.getByText("CLOSE", { exact: true }).click();
+    await mappingsModal.getByText(/^(CLOSE|BACK)$/).click();
     await expect(dashboard.getByText("INPUT MAPPINGS", { exact: true })).toBeHidden();
 
     if (await dashboard.locator("#midiDevice").isVisible()) {

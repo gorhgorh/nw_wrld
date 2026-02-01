@@ -1,4 +1,13 @@
-import { memo, Fragment, useState, useMemo, useCallback, useEffect, useRef, type ChangeEvent } from "react";
+import {
+  memo,
+  Fragment,
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type ChangeEvent,
+} from "react";
 import { useAtom } from "jotai";
 import { remove } from "lodash";
 import { useIPCSend } from "../core/hooks/useIPC";
@@ -243,7 +252,14 @@ const SortableItem = memo(
                   index: unknown,
                   newValue: unknown,
                   optionDef?: OptionDef | null
-                ) => handleRandomChange(optionName, index as number | string[], String(newValue), optionDef || null)}
+                ) =>
+                  handleRandomChange(
+                    optionName,
+                    index as number | string[],
+                    String(newValue),
+                    optionDef || null
+                  )
+                }
                 onAddMissingOption={addMissingOption}
               />
             </div>
@@ -313,7 +329,8 @@ export const MethodConfiguratorModal = ({
   }, [predefinedModules, selectedChannel]);
 
   const normalizedModuleMethods = useMemo(() => {
-    const methodsUnknown = module && typeof module === "object" ? (module as { methods?: unknown }).methods : null;
+    const methodsUnknown =
+      module && typeof module === "object" ? (module as { methods?: unknown }).methods : null;
     const list = Array.isArray(methodsUnknown) ? methodsUnknown : [];
     return list
       .map((m: unknown) => {
@@ -327,7 +344,9 @@ export const MethodConfiguratorModal = ({
             const oObj = o && typeof o === "object" ? (o as Record<string, unknown>) : {};
             const optName = String(oObj.name || "");
             if (!optName) return null;
-            const values = Array.isArray(oObj.values) ? oObj.values.map((v: unknown) => String(v)) : undefined;
+            const values = Array.isArray(oObj.values)
+              ? oObj.values.map((v: unknown) => String(v))
+              : undefined;
             return {
               name: optName,
               type: String(oObj.type || ""),
@@ -425,10 +444,12 @@ export const MethodConfiguratorModal = ({
       if (!modulesData || typeof modulesData !== "object") return;
       const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
       if (!instanceData) return;
-      
+
       const methodList = ch.isConstructor
         ? ((instanceData as Record<string, unknown>)["constructor"] as MethodConfig[] | undefined)
-        : ((instanceData.methods as Record<string, unknown> | undefined)?.[channelKey] as MethodConfig[] | undefined);
+        : ((instanceData.methods as Record<string, unknown> | undefined)?.[channelKey] as
+            | MethodConfig[]
+            | undefined);
       if (!Array.isArray(methodList) || methodList.length === 0) return;
 
       let changed = false;
@@ -574,8 +595,11 @@ export const MethodConfiguratorModal = ({
               (v as Record<string, unknown>).rows === nextRows &&
               (v as Record<string, unknown>).cols === nextCols &&
               Array.isArray((v as Record<string, unknown>).excludedCells) &&
-              ((v as Record<string, unknown>).excludedCells as string[]).length === nextExcluded.length &&
-              ((v as Record<string, unknown>).excludedCells as string[]).every((x, i) => x === nextExcluded[i]);
+              ((v as Record<string, unknown>).excludedCells as string[]).length ===
+                nextExcluded.length &&
+              ((v as Record<string, unknown>).excludedCells as string[]).every(
+                (x, i) => x === nextExcluded[i]
+              );
             if (!same) {
               opt.value = next;
               changed = true;
@@ -600,10 +624,13 @@ export const MethodConfiguratorModal = ({
     const modulesData = track.modulesData as Record<string, unknown> | undefined;
     const instanceData = modulesData?.[ch.instanceId] as Record<string, unknown> | undefined;
     if (!instanceData) return [];
-    
+
     const moduleData = {
       constructor: Array.isArray(instanceData.constructor) ? instanceData.constructor : [],
-      methods: typeof instanceData.methods === "object" ? (instanceData.methods as Record<string, unknown>) : {},
+      methods:
+        typeof instanceData.methods === "object"
+          ? (instanceData.methods as Record<string, unknown>)
+          : {},
     };
     const channelKey = ch.isConstructor ? "constructor" : String(ch.channelNumber);
     const configs = ch.isConstructor
@@ -630,7 +657,7 @@ export const MethodConfiguratorModal = ({
         if (!modulesData) return;
         const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
         if (!instanceData) return;
-        
+
         let methods: MethodConfig[];
         if (ch.isConstructor) {
           methods = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
@@ -680,11 +707,13 @@ export const MethodConfiguratorModal = ({
         if (!modulesData) return;
         const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
         if (!instanceData) return;
-        
+
         const insertMethod = methodName === "matrix" ? "unshift" : "push";
 
         if (ch.isConstructor) {
-          const constructor = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
+          const constructor = (instanceData as Record<string, unknown>)[
+            "constructor"
+          ] as MethodConfig[];
           if (insertMethod === "unshift") {
             constructor.unshift(initializedMethod);
           } else {
@@ -722,7 +751,7 @@ export const MethodConfiguratorModal = ({
         if (!modulesData) return;
         const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
         if (!instanceData) return;
-        
+
         let methods: MethodConfig[];
         if (ch.isConstructor) {
           methods = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
@@ -755,7 +784,7 @@ export const MethodConfiguratorModal = ({
         if (!modulesData) return;
         const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
         if (!instanceData) return;
-        
+
         const channelKey = ch.isConstructor ? "constructor" : String(ch.channelNumber);
         let methods: MethodConfig[];
         if (ch.isConstructor) {
@@ -861,7 +890,7 @@ export const MethodConfiguratorModal = ({
             return (
               <div key={layer.name} className="px-6 mb-6 border-neutral-800">
                 <div className="flex justify-between items-baseline mb-4">
-                  <div className="uppercase text-neutral-300 text-[11px] relative inline-block">
+                  <div className="opacity-50 text-neutral-300 text-[11px] relative inline-block">
                     {layer.name} Methods
                   </div>
                   <div className="relative">
@@ -906,19 +935,27 @@ export const MethodConfiguratorModal = ({
                       if (!currentLayer) return;
 
                       updateActiveSet(setUserData, activeSetId, (activeSet) => {
-                        const channelKey = ch.isConstructor ? "constructor" : String(ch.channelNumber);
+                        const channelKey = ch.isConstructor
+                          ? "constructor"
+                          : String(ch.channelNumber);
                         const tracksUnknown = (activeSet as Record<string, unknown>).tracks;
                         if (!Array.isArray(tracksUnknown)) return;
                         const trackUnknown = tracksUnknown[ch.trackIndex];
                         if (!trackUnknown || typeof trackUnknown !== "object") return;
                         const track = trackUnknown as Record<string, unknown>;
-                        const modulesData = track.modulesData as Record<string, unknown> | undefined;
+                        const modulesData = track.modulesData as
+                          | Record<string, unknown>
+                          | undefined;
                         if (!modulesData) return;
-                        const instanceData = modulesData[ch.instanceId] as Record<string, unknown> | undefined;
+                        const instanceData = modulesData[ch.instanceId] as
+                          | Record<string, unknown>
+                          | undefined;
                         if (!instanceData) return;
-                        
+
                         if (ch.isConstructor) {
-                          const _methods = (instanceData as Record<string, unknown>)["constructor"] as MethodConfig[];
+                          const _methods = (instanceData as Record<string, unknown>)[
+                            "constructor"
+                          ] as MethodConfig[];
                           void _methods;
                         } else {
                           const methodsObj = instanceData.methods as Record<string, unknown>;
@@ -944,7 +981,8 @@ export const MethodConfiguratorModal = ({
                         );
 
                         if (ch.isConstructor) {
-                          (instanceData as Record<string, unknown>)["constructor"] = allReorderedMethods;
+                          (instanceData as Record<string, unknown>)["constructor"] =
+                            allReorderedMethods;
                         } else {
                           (instanceData.methods as Record<string, unknown>)[channelKey] =
                             allReorderedMethods;
@@ -961,25 +999,25 @@ export const MethodConfiguratorModal = ({
                           });
                         };
                         return (
-                        <Fragment key={method.name}>
-                          <SortableItem
-                            id={method.name}
-                            method={method}
-                            handleRemoveMethod={removeMethod}
-                            changeOption={changeOption}
-                            addMissingOption={addMissingOption}
-                            moduleMethods={normalizedModuleMethods}
-                            moduleName={module ? module.name : null}
-                            userColors={userColors}
-                            onShowMethodCode={handleShowMethodCode}
-                          />
-                          {methodIndex < layer.configuredMethods.length - 1 && (
-                            <div className="flex-shrink-0 flex items-center w-4 min-h-[40px]">
-                              <div className="w-full h-px bg-neutral-800" />
-                            </div>
-                          )}
-                        </Fragment>
-                      );
+                          <Fragment key={method.name}>
+                            <SortableItem
+                              id={method.name}
+                              method={method}
+                              handleRemoveMethod={removeMethod}
+                              changeOption={changeOption}
+                              addMissingOption={addMissingOption}
+                              moduleMethods={normalizedModuleMethods}
+                              moduleName={module ? module.name : null}
+                              userColors={userColors}
+                              onShowMethodCode={handleShowMethodCode}
+                            />
+                            {methodIndex < layer.configuredMethods.length - 1 && (
+                              <div className="flex-shrink-0 flex items-center w-4 min-h-[40px]">
+                                <div className="w-full h-px bg-neutral-800" />
+                              </div>
+                            )}
+                          </Fragment>
+                        );
                       })}
                     </div>
                   </SortableList>
@@ -1020,7 +1058,9 @@ export const MethodConfiguratorModal = ({
                 type="secondary"
                 className="text-[11px]"
                 disabled={selectedTrackChannelCount <= 3}
-                title={selectedTrackChannelCount <= 3 ? "Minimum 3 channels required" : "Delete Channel"}
+                title={
+                  selectedTrackChannelCount <= 3 ? "Minimum 3 channels required" : "Delete Channel"
+                }
               >
                 DELETE CHANNEL
               </Button>

@@ -4,6 +4,15 @@ import * as fs from "node:fs/promises";
 import { createTestWorkspace } from "../fixtures/testWorkspace";
 import { launchNwWrld } from "../fixtures/launchElectron";
 
+const pathExists = async (p: string): Promise<boolean> => {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const waitForProjectReady = async (page: import("playwright").Page) => {
   await page.waitForLoadState("domcontentloaded");
   await page.waitForFunction(
@@ -69,6 +78,10 @@ test("deleting the project folder while running prompts on reload (no crash)", a
         movedDir = null;
       }
     }
+
+    await expect
+      .poll(async () => !(await pathExists(dir)), { timeout: 15_000 })
+      .toBe(true);
 
     await reloadWithRetry(dashboard);
     await waitForProjectLost(dashboard);

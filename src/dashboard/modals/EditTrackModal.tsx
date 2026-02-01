@@ -4,7 +4,7 @@ import { Modal } from "../shared/Modal";
 import { ModalHeader } from "../components/ModalHeader";
 import { ModalFooter } from "../components/ModalFooter";
 import { Button } from "../components/Button";
-import { TextInput, Select, Label, ValidationError } from "../components/FormInputs";
+import { TextInput, Select, ValidationError } from "../components/FormInputs";
 import { HelpIcon } from "../components/HelpIcon";
 import { userDataAtom, activeSetIdAtom } from "../core/state";
 import { updateActiveSet } from "../core/utils";
@@ -26,7 +26,12 @@ type EditTrackModalProps = {
   inputConfig?: InputConfigLike | null;
 };
 
-export const EditTrackModal = ({ isOpen, onClose, trackIndex, inputConfig }: EditTrackModalProps) => {
+export const EditTrackModal = ({
+  isOpen,
+  onClose,
+  trackIndex,
+  inputConfig,
+}: EditTrackModalProps) => {
   const [userData, setUserData] = useAtom(userDataAtom);
   const [activeSetId] = useAtom(activeSetIdAtom);
   const [trackName, setTrackName] = useState("");
@@ -50,19 +55,16 @@ export const EditTrackModal = ({ isOpen, onClose, trackIndex, inputConfig }: Edi
   const { validate } = useNameValidation(tracks, trackId);
   const validation = validate(trackName);
 
-  const { availableSlots, getTrigger } = useTrackSlots(
-    tracks,
-    globalMappings,
-    inputType,
-    trackId
-  );
+  const { availableSlots, getTrigger } = useTrackSlots(tracks, globalMappings, inputType, trackId);
 
   const resolvedTrigger = getTrigger(trackSlot);
   const resolvedNoteName =
     inputType === "midi"
       ? (() => {
           const pc =
-            typeof resolvedTrigger === "number" ? resolvedTrigger : parsePitchClass(resolvedTrigger);
+            typeof resolvedTrigger === "number"
+              ? resolvedTrigger
+              : parsePitchClass(resolvedTrigger);
           if (pc === null) return null;
           return pitchClassToName(pc) || String(pc);
         })()
@@ -113,68 +115,70 @@ export const EditTrackModal = ({ isOpen, onClose, trackIndex, inputConfig }: Edi
     <Modal isOpen={isOpen} onClose={onClose}>
       <ModalHeader title="EDIT TRACK" onClose={onClose} />
 
-      <div className="px-6 flex flex-col gap-4">
-        <div>
-          <Label>Track Name</Label>
-          <TextInput
-            value={trackName}
-            onChange={(e) => setTrackName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && canSubmit) {
-                handleSubmit();
-              }
-            }}
-            className="w-full"
-            placeholder="My Performance Track"
-            autoFocus
-          />
-          <ValidationError value={trackName} validation={validation} />
-        </div>
-
-        <div>
-          <div className="relative inline-block">
-            <Label>Track Number</Label>
-            <HelpIcon helpText={HELP_TEXT.trackSlot} />
+      <div className="px-6">
+        <div className="flex flex-col gap-2 font-mono">
+          <div>
+            <div className="opacity-50 text-[11px] mb-1">Track Name</div>
+            <TextInput
+              value={trackName}
+              onChange={(e) => setTrackName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) {
+                  handleSubmit();
+                }
+              }}
+              className="w-full"
+              placeholder="My Performance Track"
+              autoFocus
+            />
+            <ValidationError value={trackName} validation={validation} />
           </div>
-          <Select
-            value={trackSlot}
-            onChange={(e) => setTrackSlot(parseInt(e.target.value, 10))}
-            className="w-full py-1 font-mono"
-          >
-            {Array.from({ length: maxTrackSlots }, (_, i) => i + 1).map((slot) => {
-              const rawTrigger = getTrigger(slot);
-              const trigger =
-                inputType === "midi"
-                  ? noteMatchMode === "pitchClass"
-                    ? (() => {
-                        const pc =
-                          typeof rawTrigger === "number"
-                            ? rawTrigger
-                            : parsePitchClass(rawTrigger);
-                        if (pc === null) return String(rawTrigger || "").trim();
-                        return pitchClassToName(pc) || String(pc);
-                      })()
-                    : String(rawTrigger || "").trim()
-                  : rawTrigger;
-              const takenBy = takenSlotToTrackName.get(slot) || "";
-              const isTaken = Boolean(takenBy);
-              return (
-                <option key={slot} value={slot} className="bg-[#101010]" disabled={isTaken}>
-                  Track {slot} ({trigger || "not configured"})
-                  {isTaken ? ` — used by ${takenBy}` : ""}
-                </option>
-              );
-            })}
-          </Select>
-          {inputType === "midi" && resolvedNoteName ? (
-            <div className="text-blue-500 text-[11px] mt-1 font-mono">
-              ✓ Will use trigger: <span className="text-blue-500">{resolvedNoteName}</span>
+
+          <div>
+            <div className="text-[11px] relative inline-block mb-1">
+              <span className="opacity-50">Track Number</span>
+              <HelpIcon helpText={HELP_TEXT.trackSlot} />
             </div>
-          ) : resolvedTrigger ? (
-            <div className="text-blue-500 text-[11px] mt-1 font-mono">
-              ✓ Will use trigger: {resolvedTrigger}
-            </div>
-          ) : null}
+            <Select
+              value={trackSlot}
+              onChange={(e) => setTrackSlot(parseInt(e.target.value, 10))}
+              className="w-full py-1 font-mono"
+            >
+              {Array.from({ length: maxTrackSlots }, (_, i) => i + 1).map((slot) => {
+                const rawTrigger = getTrigger(slot);
+                const trigger =
+                  inputType === "midi"
+                    ? noteMatchMode === "pitchClass"
+                      ? (() => {
+                          const pc =
+                            typeof rawTrigger === "number"
+                              ? rawTrigger
+                              : parsePitchClass(rawTrigger);
+                          if (pc === null) return String(rawTrigger || "").trim();
+                          return pitchClassToName(pc) || String(pc);
+                        })()
+                      : String(rawTrigger || "").trim()
+                    : rawTrigger;
+                const takenBy = takenSlotToTrackName.get(slot) || "";
+                const isTaken = Boolean(takenBy);
+                return (
+                  <option key={slot} value={slot} className="bg-[#101010]" disabled={isTaken}>
+                    Track {slot} ({trigger || "not configured"})
+                    {isTaken ? ` — used by ${takenBy}` : ""}
+                  </option>
+                );
+              })}
+            </Select>
+            {inputType === "midi" && resolvedNoteName ? (
+              <div className="text-blue-500 text-[11px] mt-1 font-mono">
+                ✓ Will use trigger: <span className="text-blue-500">{resolvedNoteName}</span>
+              </div>
+            ) : resolvedTrigger ? (
+              <div className="text-blue-500 text-[11px] mt-1 font-mono">
+                ✓ Will use trigger: {resolvedTrigger}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -189,4 +193,3 @@ export const EditTrackModal = ({ isOpen, onClose, trackIndex, inputConfig }: Edi
     </Modal>
   );
 };
-

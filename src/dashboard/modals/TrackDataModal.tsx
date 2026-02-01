@@ -18,17 +18,20 @@ export const TrackDataModal = ({ isOpen, onClose, trackData }: TrackDataModalPro
     <Modal isOpen={isOpen} onClose={onClose} size="large">
       <ModalHeader title={`Track: ${String(td?.name || "")}`} onClose={onClose} />
 
-      {jsonString ? (
-        <div>
-          <div className="text-neutral-300/50 text-[10px] mb-1">Track Data:</div>
-          <pre className="p-4 border border-neutral-800 overflow-x-auto text-[10px] text-neutral-300 font-mono max-h-[400px] overflow-y-auto">
-            <code>{jsonString}</code>
-          </pre>
+      <div className="px-6">
+        <div className="flex flex-col gap-2 font-mono">
+          {jsonString ? (
+            <div>
+              <div className="opacity-50 text-[11px] mb-1">Track Data:</div>
+              <pre className="p-4 border border-neutral-800 overflow-x-auto text-[10px] text-neutral-300 max-h-[400px] overflow-y-auto">
+                <code>{jsonString}</code>
+              </pre>
+            </div>
+          ) : (
+            <div className="opacity-50 text-[11px]">No track data available.</div>
+          )}
         </div>
-      ) : (
-        <div className="text-neutral-300/50 text-[11px]">No track data available.</div>
-      )}
+      </div>
     </Modal>
   );
 };
-

@@ -7,6 +7,83 @@ type BufferedMessage = {
 };
 
 export async function installProjectorMessageBuffer(page: Page): Promise<void> {
+  try {
+    await page.addInitScript(() => {
+      const storageKey = "__nwWrldE2EProjectorMessages";
+      const anyGlobal = globalThis as unknown as {
+        __nwWrldE2EProjector?: {
+          messages: { type: string; props: Record<string, unknown>; ts: number }[];
+          installed: boolean;
+          cleanup?: (() => void) | undefined;
+        };
+      };
+
+      const loadExisting = () => {
+        if (anyGlobal.__nwWrldE2EProjector?.messages?.length) return;
+        try {
+          const raw = globalThis.sessionStorage?.getItem?.(storageKey) || null;
+          if (!raw) return;
+          const parsed = JSON.parse(raw) as unknown;
+          if (!Array.isArray(parsed)) return;
+          anyGlobal.__nwWrldE2EProjector = {
+            messages: parsed.filter((x) => x && typeof x === "object") as {
+              type: string;
+              props: Record<string, unknown>;
+              ts: number;
+            }[],
+            installed: false,
+          };
+        } catch {}
+      };
+
+      const tryInstall = () => {
+        loadExisting();
+        if (anyGlobal.__nwWrldE2EProjector?.installed) return true;
+
+        const bridge = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge as
+          | { messaging?: { onFromDashboard?: unknown } }
+          | null
+          | undefined;
+        const messaging = bridge?.messaging;
+        if (!messaging || typeof messaging.onFromDashboard !== "function") return false;
+
+        if (!anyGlobal.__nwWrldE2EProjector) {
+          anyGlobal.__nwWrldE2EProjector = { messages: [], installed: false };
+        }
+        anyGlobal.__nwWrldE2EProjector.installed = true;
+
+        const cleanup = messaging.onFromDashboard((_event: unknown, data: unknown) => {
+          if (!data || typeof data !== "object") return;
+          const rawType = (data as { type?: unknown }).type;
+          const rawProps = (data as { props?: unknown }).props;
+          const type = typeof rawType === "string" ? rawType : String(rawType ?? "");
+          const props =
+            rawProps && typeof rawProps === "object" && !Array.isArray(rawProps)
+              ? (rawProps as Record<string, unknown>)
+              : {};
+          const next = { type, props, ts: Date.now() };
+          anyGlobal.__nwWrldE2EProjector?.messages.push(next);
+          try {
+            globalThis.sessionStorage?.setItem?.(
+              storageKey,
+              JSON.stringify(anyGlobal.__nwWrldE2EProjector?.messages || [])
+            );
+          } catch {}
+        });
+        anyGlobal.__nwWrldE2EProjector.cleanup = typeof cleanup === "function" ? cleanup : undefined;
+        return true;
+      };
+
+      const started = Date.now();
+      const tick = () => {
+        if (tryInstall()) return;
+        if (Date.now() - started > 15_000) return;
+        setTimeout(tick, 50);
+      };
+      tick();
+    });
+  } catch {}
+
   await page.waitForFunction(
     () => {
       const bridge = globalThis.nwWrldBridge as unknown as {

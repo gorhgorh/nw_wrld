@@ -139,7 +139,7 @@ export const AddModuleModal = ({
       const trackUnknown = tracksUnknown[effectiveTrackIndex];
       if (typeof trackUnknown !== "object" || !trackUnknown) return;
       const t = trackUnknown as Record<string, unknown>;
-      
+
       const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const modulesArray = Array.isArray(t.modules) ? t.modules : [];
       modulesArray.push({
@@ -147,7 +147,7 @@ export const AddModuleModal = ({
         type: module.id || module.name,
       });
       t.modules = modulesArray;
-      
+
       const moduleMethods = Array.isArray(module.methods) ? module.methods : [];
       const hasMethodData = moduleMethods.length > 0;
       const constructorMethods = hasMethodData
@@ -179,10 +179,11 @@ export const AddModuleModal = ({
           options: [{ name: "duration", value: 0 }],
         });
       }
-      
-      const modulesData = typeof t.modulesData === "object" && t.modulesData
-        ? (t.modulesData as Record<string, unknown>)
-        : {};
+
+      const modulesData =
+        typeof t.modulesData === "object" && t.modulesData
+          ? (t.modulesData as Record<string, unknown>)
+          : {};
       modulesData[instanceId] = {
         constructor: constructorMethods,
         methods: {},
@@ -319,12 +320,11 @@ export const AddModuleModal = ({
       <ModalHeader title={modalTitle} onClose={handleClose} />
 
       <div className="px-6">
-        {Object.entries(modulesByCategory).map(([category, modules]) => (
-          <div key={category} className="mb-6 font-mono">
-            <div className="mb-2">
-              <div className="opacity-50 text-[11px] text-neutral-300">{category}:</div>
-
-              <div className="pl-6 uppercase flex flex-col flex-wrap gap-2">
+        <div className="flex flex-col gap-8 font-mono">
+          {Object.entries(modulesByCategory).map(([category, modules]) => (
+            <div key={category}>
+              <div className="opacity-50 text-[11px] mb-1">{category}:</div>
+              <div className="pl-6 uppercase flex flex-col gap-2">
                 {modules.map((module) => {
                   const handlePreview = () => {
                     const hoveredId = module.id || module.name;
@@ -434,7 +434,9 @@ export const AddModuleModal = ({
                                   try {
                                     (
                                       globalThis as unknown as {
-                                        nwWrldBridge?: { app?: { openProjectorDevTools?: () => void } };
+                                        nwWrldBridge?: {
+                                          app?: { openProjectorDevTools?: () => void };
+                                        };
                                       }
                                     )?.nwWrldBridge?.app?.openProjectorDevTools?.();
                                   } catch {}
@@ -502,27 +504,27 @@ export const AddModuleModal = ({
                 })}
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {skippedList.length > 0 ? (
-          <div className="mt-6 font-mono border-t border-neutral-800 pt-4">
-            <div className="mb-2 opacity-50 text-[11px] text-neutral-300">Skipped modules:</div>
-            <div className="pl-6 flex flex-col gap-2">
-              {skippedList.map((s) => (
-                <div key={s.file} className="flex items-start gap-2 text-[11px] text-neutral-300">
-                  <span className="text-red-500/70 mt-[1px]">
-                    <FaExclamationTriangle />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="truncate">{s.file}</div>
-                    <div className="opacity-60">{s.reason}</div>
+          {skippedList.length > 0 ? (
+            <div>
+              <div className="opacity-50 text-[11px] mb-1">Skipped modules:</div>
+              <div className="pl-6 flex flex-col gap-2">
+                {skippedList.map((s) => (
+                  <div key={s.file} className="flex items-start gap-2 text-[11px] text-neutral-300">
+                    <span className="text-red-500/70 mt-[1px]">
+                      <FaExclamationTriangle />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate">{s.file}</div>
+                      <div className="opacity-60">{s.reason}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </Modal>
   );

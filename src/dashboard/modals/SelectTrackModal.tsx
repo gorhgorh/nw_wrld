@@ -6,7 +6,7 @@ import { SortableList, arrayMove } from "../shared/SortableList";
 import { ModalHeader } from "../components/ModalHeader";
 import { ModalFooter } from "../components/ModalFooter";
 import { Button } from "../components/Button";
-import { RadioButton, Label } from "../components/FormInputs";
+import { RadioButton } from "../components/FormInputs";
 import { updateActiveSet } from "../core/utils";
 import { getActiveSetTracks, getActiveSet } from "../../shared/utils/setUtils";
 import { EditTrackModal } from "./EditTrackModal";
@@ -186,46 +186,48 @@ export const SelectTrackModal = ({
       <Modal isOpen={isOpen} onClose={onClose} size="small">
         <ModalHeader title="TRACKS" onClose={onClose} />
 
-        <div className="px-6 flex flex-col gap-4">
-          <div>
-            <Label>Select Active Track:</Label>
-            {tracks.length === 0 ? (
-              <div className="text-neutral-500 text-[11px] font-mono py-2">
-                No tracks in this set
+        <div className="px-6">
+          <div className="flex flex-col gap-2 font-mono">
+            <div>
+              <div className="opacity-50 text-[11px] mb-1">Select Active Track:</div>
+              <div className="pl-6">
+                {tracks.length === 0 ? (
+                  <div className="text-neutral-500 text-[11px] py-2">No tracks in this set</div>
+                ) : (
+                  <SortableList
+                    items={tracks}
+                    onReorder={(oldIndex: number, newIndex: number) => {
+                      updateActiveSet(setUserData, activeSetId, (activeSet) => {
+                        const tracksUnknown = (activeSet as Record<string, unknown>).tracks;
+                        if (Array.isArray(tracksUnknown)) {
+                          (activeSet as Record<string, unknown>).tracks = arrayMove(
+                            tracksUnknown,
+                            oldIndex,
+                            newIndex
+                          );
+                        }
+                      });
+                    }}
+                  >
+                    <div className="flex flex-col gap-2">
+                      {tracks.map((track, trackIndex) => (
+                        <SortableTrackItem
+                          key={track.id}
+                          track={track}
+                          trackIndex={trackIndex}
+                          activeTrackId={activeTrackId}
+                          inputType={String(inputType)}
+                          globalMappings={globalMappings}
+                          onTrackSelect={handleTrackSelect}
+                          onEdit={setEditingTrackIndex}
+                          onDelete={handleDeleteTrack}
+                        />
+                      ))}
+                    </div>
+                  </SortableList>
+                )}
               </div>
-            ) : (
-              <SortableList
-                items={tracks}
-                onReorder={(oldIndex: number, newIndex: number) => {
-                  updateActiveSet(setUserData, activeSetId, (activeSet) => {
-                    const tracksUnknown = (activeSet as Record<string, unknown>).tracks;
-                    if (Array.isArray(tracksUnknown)) {
-                      (activeSet as Record<string, unknown>).tracks = arrayMove(
-                        tracksUnknown,
-                        oldIndex,
-                        newIndex
-                      );
-                    }
-                  });
-                }}
-              >
-                <div className="flex flex-col gap-2">
-                  {tracks.map((track, trackIndex) => (
-                    <SortableTrackItem
-                      key={track.id}
-                      track={track}
-                      trackIndex={trackIndex}
-                      activeTrackId={activeTrackId}
-                      inputType={String(inputType)}
-                      globalMappings={globalMappings}
-                      onTrackSelect={handleTrackSelect}
-                      onEdit={setEditingTrackIndex}
-                      onDelete={handleDeleteTrack}
-                    />
-                  ))}
-                </div>
-              </SortableList>
-            )}
+            </div>
           </div>
         </div>
 
