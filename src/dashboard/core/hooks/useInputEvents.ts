@@ -26,11 +26,11 @@ type UseInputEventsArgs = {
   userData: unknown;
   activeSetId: unknown;
   userDataRef: MutableRefObject<unknown>;
-  activeTrackIdRef: MutableRefObject<string | null>;
+  activeTrackIdRef: MutableRefObject<string | number | null>;
   activeSetIdRef: MutableRefObject<unknown>;
   recordingStateRef: MutableRefObject<RecordingState>;
   triggerMapsRef: MutableRefObject<TriggerMaps>;
-  setActiveTrackId: (trackId: string) => void;
+  setActiveTrackId: (trackId: string | number) => void;
   setRecordingData: Dispatch<SetStateAction<Record<string, unknown>>>;
   setRecordingState: Dispatch<SetStateAction<RecordingState>>;
   flashChannel: (channel: string, durationMs: number) => void;
@@ -294,17 +294,19 @@ export const useInputEvents = ({
               return tr ? tr.name === resolvedTrackName : false;
             }) as Record<string, unknown> | undefined;
             if (targetTrack) {
-              const id = typeof targetTrack.id === "string" ? targetTrack.id : null;
+              const idRaw = targetTrack.id;
+              const id = typeof idRaw === "string" || typeof idRaw === "number" ? idRaw : null;
+              const idKey = id == null ? null : String(id);
               const name = typeof targetTrack.name === "string" ? targetTrack.name : null;
-              if (id && name) {
+              if (id != null && idKey && name) {
                 trackName = name;
                 setActiveTrackId(id);
 
-                const wasRecording = recordingStateRef.current[id];
+                const wasRecording = recordingStateRef.current[idKey];
                 if (wasRecording) {
                   setRecordingData((prev) => {
-                    const existing = getRecordingForTrack(prev, id);
-                    return setRecordingForTrack(prev, id, {
+                    const existing = getRecordingForTrack(prev, idKey);
+                    return setRecordingForTrack(prev, idKey, {
                       ...(existing as Record<string, unknown>),
                       channels: [],
                     });
@@ -313,7 +315,7 @@ export const useInputEvents = ({
 
                 setRecordingState((prev) => ({
                   ...prev,
-                  [id]: {
+                  [idKey]: {
                     startTime: Date.now(),
                     isRecording: true,
                   },
@@ -328,7 +330,7 @@ export const useInputEvents = ({
                           ? (moduleInstance as Record<string, unknown>)
                           : null;
                       const mid = mi && typeof mi.id === "string" ? mi.id : null;
-                      return mid ? `${id}:${mid}` : null;
+                      return mid ? `${idKey}:${mid}` : null;
                     })
                     .filter((k): k is string => Boolean(k));
                   setFlashingConstructors((prev) => {
@@ -351,10 +353,15 @@ export const useInputEvents = ({
         }
 
         case "method-trigger": {
-          const currentActiveTrackId = activeTrackIdRef.current;
+          const currentActiveTrackIdRaw = activeTrackIdRef.current;
+          const currentActiveTrackIdKey =
+            currentActiveTrackIdRaw == null ? null : String(currentActiveTrackIdRaw);
           const activeTrack = (tracks as unknown[]).find((t) => {
             const tr = t && typeof t === "object" ? (t as Record<string, unknown>) : null;
-            return tr ? tr.id === currentActiveTrackId : false;
+            if (!tr) return false;
+            const idRaw = tr.id;
+            if (idRaw == null || currentActiveTrackIdKey == null) return false;
+            return String(idRaw) === currentActiveTrackIdKey;
           }) as Record<string, unknown> | undefined;
 
           if (activeTrack && activeTrack.channelMappings) {
@@ -445,8 +452,8 @@ export const useInputEvents = ({
               flashChannel(channel, 100);
             });
 
-            if (currentActiveTrackId && channelsToFlash.length > 0) {
-              const recordingStateForTrack = recordingStateRef.current[currentActiveTrackId];
+            if (currentActiveTrackIdKey && channelsToFlash.length > 0) {
+              const recordingStateForTrack = recordingStateRef.current[currentActiveTrackIdKey];
               if (recordingStateForTrack?.isRecording) {
                 const currentTime = Date.now();
                 const relativeTime = (currentTime - recordingStateForTrack.startTime) / 1000;
@@ -454,7 +461,7 @@ export const useInputEvents = ({
                 channelsToFlash.forEach((channelNumber) => {
                   const channelName = `ch${channelNumber}`;
                   setRecordingData((prev) => {
-                    const recording = getRecordingForTrack(prev, currentActiveTrackId);
+                    const recording = getRecordingForTrack(prev, currentActiveTrackIdKey);
                     const newRecording = { ...(recording as Record<string, unknown>) };
 
                     const channels = Array.isArray(newRecording.channels)
@@ -483,7 +490,7 @@ export const useInputEvents = ({
 
                     newRecording.channels = channels;
 
-                    return setRecordingForTrack(prev, currentActiveTrackId, newRecording);
+                    return setRecordingForTrack(prev, currentActiveTrackIdKey, newRecording);
                   });
                 });
               }

@@ -16,6 +16,8 @@ import {
   pitchClassToName,
   resolveTrackTrigger,
 } from "../../shared/midi/midiUtils";
+import type { AudioCaptureState } from "../core/hooks/useDashboardAudioCapture";
+import type { FileAudioState } from "../core/hooks/useDashboardFileAudio";
 
 type Track = {
   id: string | number;
@@ -92,6 +94,8 @@ const SortableTrackItem = ({
           <button
             onClick={() => onEdit(trackIndex)}
             className="text-neutral-500 hover:text-neutral-300 text-[11px]"
+            data-testid="edit-track"
+            aria-label="Edit track"
           >
             <FaEdit />
           </button>
@@ -127,6 +131,8 @@ type SelectTrackModalProps = {
   activeSetId: string | null;
   recordingData: Record<string, unknown>;
   setRecordingData: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void;
+  audioCaptureState: AudioCaptureState;
+  fileAudioState: FileAudioState;
   onCreateTrack: () => void;
   onConfirmDelete: (message: string, onConfirm: () => void) => void;
 };
@@ -143,6 +149,8 @@ export const SelectTrackModal = ({
   setRecordingData,
   onCreateTrack,
   onConfirmDelete,
+  audioCaptureState,
+  fileAudioState,
 }: SelectTrackModalProps) => {
   const [editingTrackIndex, setEditingTrackIndex] = useState<number | null>(null);
 
@@ -248,6 +256,8 @@ export const SelectTrackModal = ({
           onClose={() => setEditingTrackIndex(null)}
           trackIndex={editingTrackIndex}
           inputConfig={userData.config?.input || {}}
+          audioCaptureState={audioCaptureState}
+          fileAudioState={fileAudioState}
         />
       )}
     </>

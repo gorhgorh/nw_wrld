@@ -76,7 +76,7 @@ test("userData.json sanitize ensures each track has at least 3 channelMappings k
             name: "T",
             modules: [],
             modulesData: {},
-            channelMappings: { "1": 1 },
+            channelMappings: { 1: 1 },
           },
         ],
       },
@@ -89,6 +89,72 @@ test("userData.json sanitize ensures each track has at least 3 channelMappings k
   assert.ok(keys.includes("1"));
   assert.ok(keys.includes("2"));
   assert.ok(keys.includes("3"));
+});
+
+test("userData.json sanitize ensures each track has signal.audio and signal.file defaults", () => {
+  const defaultValue = { config: {}, sets: [] };
+  const input = {
+    config: {},
+    sets: [
+      {
+        id: "set_1",
+        name: "Set 1",
+        tracks: [
+          { id: 1, name: "T", modules: [], modulesData: {}, channelMappings: { 1: 1, 2: 2, 3: 3 } },
+        ],
+      },
+    ],
+  };
+  const res = sanitizeJsonForBridge("userData.json", input, defaultValue);
+  const track = res.sets[0].tracks[0];
+  assert.ok(track.signal && typeof track.signal === "object");
+  assert.ok(track.signal.audio && typeof track.signal.audio === "object");
+  assert.ok(track.signal.file && typeof track.signal.file === "object");
+  assert.deepEqual(track.signal.audio.thresholds, { low: 0.5, medium: 0.5, high: 0.5 });
+  assert.equal(track.signal.audio.minIntervalMs, 120);
+  assert.deepEqual(track.signal.file.thresholds, { low: 0.5, medium: 0.5, high: 0.5 });
+  assert.equal(track.signal.file.minIntervalMs, 120);
+  assert.equal(track.signal.file.assetRelPath, "");
+  assert.equal(track.signal.file.assetName, "");
+});
+
+test("userData.json sanitize clamps track signal values", () => {
+  const defaultValue = { config: {}, sets: [] };
+  const input = {
+    config: {},
+    sets: [
+      {
+        id: "set_1",
+        name: "Set 1",
+        tracks: [
+          {
+            id: 1,
+            name: "T",
+            modules: [],
+            modulesData: {},
+            channelMappings: { 1: 1, 2: 2, 3: 3 },
+            signal: {
+              audio: { thresholds: { low: -1, medium: 2, high: 0.25 }, minIntervalMs: 100000 },
+              file: {
+                thresholds: { low: NaN, medium: 0.1, high: Infinity },
+                minIntervalMs: -50,
+                assetRelPath: "  ",
+                assetName: 123,
+              },
+            },
+          },
+        ],
+      },
+    ],
+  };
+  const res = sanitizeJsonForBridge("userData.json", input, defaultValue);
+  const track = res.sets[0].tracks[0];
+  assert.deepEqual(track.signal.audio.thresholds, { low: 0, medium: 1, high: 0.25 });
+  assert.equal(track.signal.audio.minIntervalMs, 10_000);
+  assert.deepEqual(track.signal.file.thresholds, { low: 0.5, medium: 0.1, high: 0.5 });
+  assert.equal(track.signal.file.minIntervalMs, 0);
+  assert.equal(track.signal.file.assetRelPath, "");
+  assert.equal(track.signal.file.assetName, "");
 });
 
 test("userData.json sanitize normalizes track module disabled flag to boolean true only", () => {
@@ -129,8 +195,9 @@ test("userData.json sanitize preserves config.aspectRatio (startup-critical)", (
 });
 
 test("userData.json sanitize guarantees file mappings keys exist", () => {
-  const defaultValue = require(path.join(__dirname, "..", "dist", "runtime", "shared", "config", "defaultConfig.js"))
-    .DEFAULT_USER_DATA;
+  const defaultValue = require(
+    path.join(__dirname, "..", "dist", "runtime", "shared", "config", "defaultConfig.js")
+  ).DEFAULT_USER_DATA;
   const input = {
     config: {
       trackMappings: { midi: {}, osc: {}, audio: {} },

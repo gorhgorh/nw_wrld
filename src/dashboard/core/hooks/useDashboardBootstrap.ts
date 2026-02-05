@@ -5,7 +5,6 @@ import { loadRecordingData } from "../../../shared/json/recordingUtils";
 import { loadAppState } from "../../../shared/json/appStateUtils";
 import { loadUserData } from "../utils";
 import { useIPCListener } from "./useIPC";
-import { AUDIO_DEFAULTS } from "../audio/audioTuning";
 
 type UseDashboardBootstrapArgs = {
   isInitialMountRef: { current: boolean };
@@ -51,7 +50,8 @@ export const useDashboardBootstrap = ({
       const recordings = await loadRecordingData();
 
       const appState = await loadAppState();
-      const appStateObj = appState && typeof appState === 'object' ? appState as Record<string, unknown> : {};
+      const appStateObj =
+        appState && typeof appState === "object" ? (appState as Record<string, unknown>) : {};
       const activeTrackIdToUse = appStateObj.activeTrackId;
       const activeSetIdToUse = appStateObj.activeSetId;
       const sequencerMutedToUse = appStateObj.sequencerMuted;
@@ -67,9 +67,11 @@ export const useDashboardBootstrap = ({
         setIsWorkspaceModalOpen(true);
       } else {
         const bridge = (globalThis as { nwWrldBridge?: unknown }).nwWrldBridge;
-        const bridgeObj = bridge && typeof bridge === 'object' ? bridge as Record<string, unknown> : {};
+        const bridgeObj =
+          bridge && typeof bridge === "object" ? (bridge as Record<string, unknown>) : {};
         const project = bridgeObj.project;
-        const projectObj = project && typeof project === 'object' ? project as Record<string, unknown> : {};
+        const projectObj =
+          project && typeof project === "object" ? (project as Record<string, unknown>) : {};
         const isAvailable =
           typeof projectObj.isDirAvailable === "function"
             ? (projectObj.isDirAvailable as () => boolean)()
@@ -82,61 +84,40 @@ export const useDashboardBootstrap = ({
       }
 
       if (activeSetIdToUse) {
-        setActiveSetId(typeof activeSetIdToUse === 'string' ? activeSetIdToUse : null);
+        setActiveSetId(typeof activeSetIdToUse === "string" ? activeSetIdToUse : null);
       }
 
-      const dataObj = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+      const dataObj = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
       setUserData(dataObj);
       setRecordingData(recordings);
 
       const cfg = dataObj.config || null;
-      if (cfg && typeof cfg === 'object' && 'input' in cfg) {
+      if (cfg && typeof cfg === "object" && "input" in cfg) {
         const cfgObj = cfg as Record<string, unknown>;
-        const migrateBandThresholds = (thr: unknown) => {
-          const oldDefaultThr = 0.18;
-          const oldDefaultHighThr = 0.01;
-          if (!thr || typeof thr !== "object") return thr;
-          const t = thr as Record<string, unknown>;
-          const low = t.low;
-          const medium = t.medium;
-          const high = t.high;
-          if (
-            typeof low === "number" &&
-            Number.isFinite(low) &&
-            typeof medium === "number" &&
-            Number.isFinite(medium) &&
-            typeof high === "number" &&
-            Number.isFinite(high) &&
-            ((low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultThr) ||
-              (low === oldDefaultThr && medium === oldDefaultThr && high === oldDefaultHighThr))
-          ) {
-            return { ...t, low: AUDIO_DEFAULTS.threshold, medium: AUDIO_DEFAULTS.threshold, high: AUDIO_DEFAULTS.threshold };
-          }
-          return thr;
-        };
-
         const rawInput =
-          cfgObj.input && typeof cfgObj.input === "object" ? (cfgObj.input as Record<string, unknown>) : {};
-        const migratedAudio = migrateBandThresholds(rawInput.audioThresholds);
-        const migratedFile = migrateBandThresholds(rawInput.fileThresholds);
-        const nextInput =
-          migratedAudio !== rawInput.audioThresholds || migratedFile !== rawInput.fileThresholds
-            ? { ...rawInput, audioThresholds: migratedAudio, fileThresholds: migratedFile }
-            : rawInput;
-        setInputConfig(nextInput);
+          cfgObj.input && typeof cfgObj.input === "object"
+            ? (cfgObj.input as Record<string, unknown>)
+            : {};
+        setInputConfig(rawInput);
       }
 
       const tracks = getActiveSetTracks(data, activeSetIdToUse);
       if (tracks.length > 0) {
-        const storedTrack = activeTrackIdToUse ? tracks.find((t: { id: unknown }) => t.id === activeTrackIdToUse) : null;
+        const storedTrack = activeTrackIdToUse
+          ? tracks.find((t: { id: unknown }) => t.id === activeTrackIdToUse)
+          : null;
         if (storedTrack) {
           const trackId = (storedTrack as { id: unknown }).id;
-          setActiveTrackId(typeof trackId === 'string' || typeof trackId === 'number' ? trackId : null);
+          setActiveTrackId(
+            typeof trackId === "string" || typeof trackId === "number" ? trackId : null
+          );
         } else {
           const visibleTrack = tracks.find((t: { isVisible?: unknown }) => t.isVisible);
           const firstTrack = visibleTrack || tracks[0];
           const trackId = (firstTrack as { id: unknown }).id;
-          setActiveTrackId(typeof trackId === 'string' || typeof trackId === 'number' ? trackId : null);
+          setActiveTrackId(
+            typeof trackId === "string" || typeof trackId === "number" ? trackId : null
+          );
         }
       }
 
@@ -147,11 +128,14 @@ export const useDashboardBootstrap = ({
   }, []);
 
   useIPCListener("workspace:lostSync", (_event, payload: unknown) => {
-    const payloadObj = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
-    const lostPath = typeof payloadObj.workspacePath === 'string' ? payloadObj.workspacePath : workspacePathRef.current || null;
+    const payloadObj =
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+    const lostPath =
+      typeof payloadObj.workspacePath === "string"
+        ? payloadObj.workspacePath
+        : workspacePathRef.current || null;
     setWorkspaceModalMode("lostSync");
     setWorkspaceModalPath(lostPath);
     setIsWorkspaceModalOpen(true);
   });
 };
-

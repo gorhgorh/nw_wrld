@@ -4,8 +4,16 @@ import * as path from "node:path";
 
 import { createTestWorkspace } from "../fixtures/testWorkspace";
 import { launchNwWrld } from "../fixtures/launchElectron";
-import { installInputStatusBuffer, clearInputStatuses, getInputStatuses } from "../fixtures/inputStatusBuffer";
-import { installInputEventBuffer, clearInputEvents, getInputEvents } from "../fixtures/inputEventBuffer";
+import {
+  installInputStatusBuffer,
+  clearInputStatuses,
+  getInputStatuses,
+} from "../fixtures/inputStatusBuffer";
+import {
+  installInputEventBuffer,
+  clearInputEvents,
+  getInputEvents,
+} from "../fixtures/inputEventBuffer";
 
 const waitForProjectReady = async (page: import("playwright").Page) => {
   const maxAttempts = 3;
@@ -41,6 +49,20 @@ const getNested = (obj: unknown, keys: string[]): unknown => {
     cur = (cur as Record<string, unknown>)[k];
   }
   return cur;
+};
+
+const findTrackByName = (ud: unknown, name: string) => {
+  const sets = getNested(ud, ["sets"]);
+  if (!Array.isArray(sets) || sets.length === 0) return null;
+  const set0 = sets[0];
+  if (!set0 || typeof set0 !== "object") return null;
+  const tracks = (set0 as Record<string, unknown>).tracks;
+  if (!Array.isArray(tracks)) return null;
+  return (
+    tracks.find(
+      (t) => t && typeof t === "object" && (t as Record<string, unknown>).name === name
+    ) || null
+  );
 };
 
 const makeWavSilence = (durationMs = 100, sampleRate = 44100) => {
@@ -91,15 +113,37 @@ test("File Upload config persists across relaunch and mock file emits input-even
       .poll(
         async () => {
           const statuses = await getInputStatuses(dashboard);
-          return statuses.some((s) => s.status === "connected" && typeof s.message === "string" && s.message.includes("File"));
+          return statuses.some(
+            (s) =>
+              s.status === "connected" &&
+              typeof s.message === "string" &&
+              s.message.includes("File")
+          );
         },
         { timeout: 20_000 }
       )
       .toBe(true);
 
+    await dashboard.getByText("CLOSE", { exact: true }).click();
+    await expect(dashboard.locator("#signal-file-upload")).toBeHidden();
+
     const wavPath = path.join(dir, "e2e-upload.wav");
     await fs.writeFile(wavPath, makeWavSilence());
-    await dashboard.locator('[data-testid="file-upload-input"]').setInputFiles(wavPath);
+    await dashboard.getByText("TRACKS", { exact: true }).click();
+    const intermediateRow = dashboard
+      .locator("label")
+      .filter({ hasText: "Intermediate" })
+      .first()
+      .locator("..");
+    await intermediateRow.getByTestId("edit-track").click();
+    const saveChanges = dashboard.getByText("Save Changes", { exact: true });
+    await expect(saveChanges).toBeVisible();
+    await expect(saveChanges).not.toHaveAttribute("aria-disabled", "true");
+    await dashboard.getByTestId("track-file-upload-input").setInputFiles(wavPath);
+    await expect(dashboard.getByText("e2e-upload.wav", { exact: true })).toBeVisible();
+    await dashboard.getByText("Save Changes", { exact: true }).click();
+    await expect(dashboard.locator("text=EDIT TRACK")).toBeHidden();
+    await dashboard.getByRole("button", { name: "CLOSE" }).click();
 
     await expect
       .poll(
@@ -109,7 +153,11 @@ test("File Upload config persists across relaunch and mock file emits input-even
             return {
               type: getNested(ud, ["config", "input", "type"]),
               sequencerMode: getNested(ud, ["config", "sequencerMode"]),
-              relPath: getNested(ud, ["config", "input", "fileAssetRelPath"]),
+              relPath: getNested(findTrackByName(ud, "Intermediate"), [
+                "signal",
+                "file",
+                "assetRelPath",
+              ]),
             };
           } catch {
             return null;
@@ -120,29 +168,44 @@ test("File Upload config persists across relaunch and mock file emits input-even
       .toMatchObject({ type: "file", sequencerMode: false });
 
     const udAfter = await readUserData(dir);
-    const relPath = getNested(udAfter, ["config", "input", "fileAssetRelPath"]);
+    const relPath = getNested(findTrackByName(udAfter, "Intermediate"), [
+      "signal",
+      "file",
+      "assetRelPath",
+    ]);
     if (typeof relPath !== "string" || !relPath) {
-      throw new Error("Expected config.input.fileAssetRelPath to be set");
+      throw new Error("Expected active track signal.file.assetRelPath to be set");
     }
     const assetFullPath = path.join(dir, "assets", ...relPath.split("/"));
-    await expect.poll(async () => {
-      try {
-        const st = await fs.stat(assetFullPath);
-        return st.isFile();
-      } catch {
-        return false;
-      }
-    }, { timeout: 30_000 }).toBe(true);
-
-    await dashboard.getByText("CLOSE", { exact: true }).click();
-    await expect(dashboard.locator("#signal-file-upload")).toBeHidden();
+    await expect
+      .poll(
+        async () => {
+          try {
+            const st = await fs.stat(assetFullPath);
+            return st.isFile();
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 30_000 }
+      )
+      .toBe(true);
 
     const playToggle = dashboard.getByTestId("file-play-toggle");
     await expect(playToggle).toBeVisible();
     await expect(playToggle).toContainText("PLAY");
 
+    await dashboard.getByText("TRACKS", { exact: true }).click();
+    await dashboard.locator("label").filter({ hasText: "Intermediate" }).first().click();
+    await expect(playToggle).toBeEnabled();
+
     await dashboard.keyboard.press("Space");
     await expect(playToggle).toContainText("STOP");
+
+    await dashboard.getByText("TRACKS", { exact: true }).click();
+    await dashboard.locator("label").filter({ hasText: "Starter" }).first().click();
+    await expect(playToggle).toContainText("PLAY");
+    await expect(playToggle).toBeDisabled();
 
     await dashboard.keyboard.press("Space");
     await expect(playToggle).toContainText("PLAY");
@@ -160,7 +223,8 @@ test("File Upload config persists across relaunch and mock file emits input-even
           const events = await getInputEvents(dashboard);
           return events.some((e) => {
             if (e.type !== "method-trigger") return false;
-            const d = e.data && typeof e.data === "object" ? (e.data as Record<string, unknown>) : null;
+            const d =
+              e.data && typeof e.data === "object" ? (e.data as Record<string, unknown>) : null;
             return d?.source === "file" && d?.channelName === "low";
           });
         },
@@ -180,6 +244,13 @@ test("File Upload config persists across relaunch and mock file emits input-even
     await dashboard2.getByText("SETTINGS", { exact: true }).click();
     await expect(dashboard2.locator("#signal-file-upload")).toBeVisible();
     await expect(dashboard2.locator("#signal-file-upload")).toBeChecked();
+    const udReloaded = await readUserData(dir);
+    const relPathReloaded = getNested(findTrackByName(udReloaded, "Intermediate"), [
+      "signal",
+      "file",
+      "assetRelPath",
+    ]);
+    expect(typeof relPathReloaded).toBe("string");
   } finally {
     try {
       await app.close();
@@ -187,4 +258,3 @@ test("File Upload config persists across relaunch and mock file emits input-even
     await cleanup();
   }
 });
-

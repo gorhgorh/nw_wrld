@@ -8,7 +8,6 @@ type InputConfig = {
   type?: string;
   port?: number;
   deviceName?: string;
-  fileAssetRelPath?: string;
 };
 
 type InputStatus = {
@@ -48,6 +47,17 @@ export const DashboardFooter = ({
 }: DashboardFooterProps) => {
   const [_recordingData] = useAtom(recordingDataAtom);
   const isFileMode = !config?.sequencerMode && inputConfig?.type === "file";
+  const trackObj = track && typeof track === "object" ? (track as Record<string, unknown>) : null;
+  const trackSignal =
+    trackObj && trackObj.signal && typeof trackObj.signal === "object"
+      ? (trackObj.signal as Record<string, unknown>)
+      : null;
+  const trackFile =
+    trackSignal && trackSignal.file && typeof trackSignal.file === "object"
+      ? (trackSignal.file as Record<string, unknown>)
+      : null;
+  const trackFileAssetRelPath =
+    trackFile && typeof trackFile.assetRelPath === "string" ? trackFile.assetRelPath : "";
 
   const getStatusColor = () => {
     switch (inputStatus.status) {
@@ -146,9 +156,18 @@ export const DashboardFooter = ({
               <Button
                 onClick={isPlaying ? onStop : onPlayPause}
                 className={isPlaying ? "decoration-neutral-300" : ""}
-                title={isPlaying ? "Stop playback" : config?.sequencerMode ? "Play sequencer" : "Play file"}
+                title={
+                  isPlaying
+                    ? "Stop playback"
+                    : config?.sequencerMode
+                      ? "Play sequencer"
+                      : "Play file"
+                }
                 icon={isPlaying ? <FaStop /> : <FaPlay />}
-                disabled={(!isProjectorReady && !isPlaying) || (isFileMode && !inputConfig?.fileAssetRelPath && !isPlaying)}
+                disabled={
+                  (!isProjectorReady && !isPlaying) ||
+                  (isFileMode && !trackFileAssetRelPath && !isPlaying)
+                }
                 as="button"
                 data-testid={config?.sequencerMode ? "sequencer-play-toggle" : "file-play-toggle"}
               >
@@ -184,4 +203,3 @@ export const DashboardFooter = ({
     </div>
   );
 };
-

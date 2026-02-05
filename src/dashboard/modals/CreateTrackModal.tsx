@@ -26,9 +26,16 @@ type CreateTrackModalProps = {
   onAlert?: ((message: string) => void) | null;
 };
 
-export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }: CreateTrackModalProps) => {
+export const CreateTrackModal = ({
+  isOpen,
+  onClose,
+  inputConfig,
+  onAlert,
+}: CreateTrackModalProps) => {
   const [userData, setUserData] = useAtom(userDataAtom);
-  const [, setActiveTrackId] = useAtom(activeTrackIdAtom as unknown as PrimitiveAtom<string | null>);
+  const [, setActiveTrackId] = useAtom(
+    activeTrackIdAtom as unknown as PrimitiveAtom<string | number | null>
+  );
   const [activeSetId] = useAtom(activeSetIdAtom);
   const [trackName, setTrackName] = useState("");
   const [trackSlot, setTrackSlot] = useState(1);
@@ -58,7 +65,9 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }: Crea
     inputType === "midi"
       ? (() => {
           const pc =
-            typeof resolvedTrigger === "number" ? resolvedTrigger : parsePitchClass(resolvedTrigger);
+            typeof resolvedTrigger === "number"
+              ? resolvedTrigger
+              : parsePitchClass(resolvedTrigger);
           if (pc === null) return null;
           return pitchClassToName(pc) || String(pc);
         })()
@@ -105,6 +114,18 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }: Crea
           name: trackName,
           trackSlot: trackSlot,
           bpm: 120,
+          signal: {
+            audio: {
+              thresholds: { low: 0.5, medium: 0.5, high: 0.5 },
+              minIntervalMs: 120,
+            },
+            file: {
+              thresholds: { low: 0.5, medium: 0.5, high: 0.5 },
+              minIntervalMs: 120,
+              assetRelPath: "",
+              assetName: "",
+            },
+          },
           channelMappings: { "1": 1, "2": 2, "3": 3 },
           modules: [],
           modulesData: {},
@@ -218,4 +239,3 @@ export const CreateTrackModal = ({ isOpen, onClose, inputConfig, onAlert }: Crea
     </Modal>
   );
 };
-

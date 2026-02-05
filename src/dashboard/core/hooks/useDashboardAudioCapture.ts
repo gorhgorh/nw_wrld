@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { readDebugFlag, readLocalStorageNumber } from "../utils/readDebugFlag";
-import { AUDIO_ANALYSER_CONFIG, AUDIO_BAND_CUTOFF_HZ, AUDIO_DEFAULTS, AUDIO_NORMALIZATION_CONFIG, AUDIO_TRIGGER_CONFIG } from "../audio/audioTuning";
+import {
+  AUDIO_ANALYSER_CONFIG,
+  AUDIO_BAND_CUTOFF_HZ,
+  AUDIO_DEFAULTS,
+  AUDIO_NORMALIZATION_CONFIG,
+  AUDIO_TRIGGER_CONFIG,
+} from "../audio/audioTuning";
 
 type Band = "low" | "medium" | "high";
 
@@ -9,7 +15,7 @@ type PeaksDb = Record<Band, number>;
 
 const DEFAULT_GAINS: Record<Band, number> = { low: 6.0, medium: 14.0, high: 18.0 };
 
-type AudioCaptureState =
+export type AudioCaptureState =
   | { status: "idle"; levels: Levels; peaksDb: PeaksDb }
   | { status: "starting"; levels: Levels; peaksDb: PeaksDb }
   | { status: "running"; levels: Levels; peaksDb: PeaksDb }
@@ -42,7 +48,11 @@ export function useDashboardAudioCapture({
 }) {
   const zero: Levels = { low: 0, medium: 0, high: 0 };
   const negInf: PeaksDb = { low: -Infinity, medium: -Infinity, high: -Infinity };
-  const [state, setState] = useState<AudioCaptureState>({ status: "idle", levels: zero, peaksDb: negInf });
+  const [state, setState] = useState<AudioCaptureState>({
+    status: "idle",
+    levels: zero,
+    peaksDb: negInf,
+  });
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -76,7 +86,8 @@ export function useDashboardAudioCapture({
 
   const isMockMode = useMemo(() => {
     const testing = (globalThis as unknown as { nwWrldBridge?: unknown }).nwWrldBridge;
-    const t = testing && typeof testing === "object" ? (testing as Record<string, unknown>).testing : null;
+    const t =
+      testing && typeof testing === "object" ? (testing as Record<string, unknown>).testing : null;
     const audio = t && typeof t === "object" ? (t as Record<string, unknown>).audio : null;
     return Boolean(audio);
   }, []);
@@ -118,10 +129,19 @@ export function useDashboardAudioCapture({
         return;
       }
       if (!navigator.mediaDevices?.getUserMedia) {
-        setState({ status: "error", message: "Microphone capture not available.", levels: zero, peaksDb: negInf });
+        setState({
+          status: "error",
+          message: "Microphone capture not available.",
+          levels: zero,
+          peaksDb: negInf,
+        });
         return;
       }
-      setState({ status: "starting", levels: lastLevelsRef.current, peaksDb: lastPeaksDbRef.current });
+      setState({
+        status: "starting",
+        levels: lastLevelsRef.current,
+        peaksDb: lastPeaksDbRef.current,
+      });
       try {
         const baseConstraints = {
           echoCancellation: false,
@@ -141,10 +161,17 @@ export function useDashboardAudioCapture({
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = stream;
-        const Ctx = (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
-          .AudioContext || (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
+        const Ctx =
+          (globalThis as unknown as { AudioContext?: unknown; webkitAudioContext?: unknown })
+            .AudioContext ||
+          (globalThis as unknown as { webkitAudioContext?: unknown }).webkitAudioContext;
         if (!Ctx || typeof Ctx !== "function") {
-          setState({ status: "error", message: "AudioContext not available.", levels: zero, peaksDb: negInf });
+          setState({
+            status: "error",
+            message: "AudioContext not available.",
+            levels: zero,
+            peaksDb: negInf,
+          });
           return;
         }
         const ctx = new (Ctx as unknown as new () => AudioContext)();
@@ -161,7 +188,10 @@ export function useDashboardAudioCapture({
 
         const bins = new Float32Array(analyser.frequencyBinCount);
         const getThreshold = (band: Band) => {
-          const thrObj = thresholdsRef.current && typeof thresholdsRef.current === "object" ? thresholdsRef.current : null;
+          const thrObj =
+            thresholdsRef.current && typeof thresholdsRef.current === "object"
+              ? thresholdsRef.current
+              : null;
           const direct = thrObj ? thrObj[band] : undefined;
           const hasAnyDirect =
             thrObj &&
@@ -178,7 +208,8 @@ export function useDashboardAudioCapture({
         };
         const getMinIntervalMs = () => {
           const direct = minIntervalMsRef.current;
-          if (typeof direct === "number" && Number.isFinite(direct)) return Math.max(0, Math.min(10_000, direct));
+          if (typeof direct === "number" && Number.isFinite(direct))
+            return Math.max(0, Math.min(10_000, direct));
           const ls = readLocalStorageNumber("nwWrld.audio.minIntervalMs", NaN);
           if (Number.isFinite(ls)) return Math.max(0, Math.min(10_000, ls));
           return AUDIO_DEFAULTS.minIntervalMs;
@@ -191,7 +222,11 @@ export function useDashboardAudioCapture({
         };
 
         if (debugRef.current) {
-          const debugThresholds = { low: getThreshold("low"), medium: getThreshold("medium"), high: getThreshold("high") };
+          const debugThresholds = {
+            low: getThreshold("low"),
+            medium: getThreshold("medium"),
+            high: getThreshold("high"),
+          };
           const releaseRatio = AUDIO_TRIGGER_CONFIG.releaseRatio;
           const debugReleaseThresholds = {
             low: debugThresholds.low * releaseRatio,
@@ -254,10 +289,17 @@ export function useDashboardAudioCapture({
             const nextPeak = Math.max(rawRms, prevPeak * AUDIO_NORMALIZATION_CONFIG.shortPeakDecay);
             bandRmsPeakRef.current[band] = nextPeak;
             const prevLongPeak = bandRmsLongPeakRef.current[band];
-            const nextLongPeak = Math.max(rawRms, prevLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakDecay);
+            const nextLongPeak = Math.max(
+              rawRms,
+              prevLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakDecay
+            );
             bandRmsLongPeakRef.current[band] = nextLongPeak;
             const absFloor = dbToLin(AUDIO_NORMALIZATION_CONFIG.absoluteDenomFloorDb);
-            const denom = Math.max(nextPeak, nextLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakFloorRatio, absFloor);
+            const denom = Math.max(
+              nextPeak,
+              nextLongPeak * AUDIO_NORMALIZATION_CONFIG.longPeakFloorRatio,
+              absFloor
+            );
             const normalized = denom > AUDIO_TRIGGER_CONFIG.minVelocityDenom ? rawRms / denom : 0;
             const gainRatio = DEFAULT_GAINS[band] > 0 ? gains[band] / DEFAULT_GAINS[band] : 1;
             const afterGain = normalized * gainRatio;
@@ -266,11 +308,15 @@ export function useDashboardAudioCapture({
             const threshold = getThreshold(band);
             const releaseThreshold = threshold * releaseRatio;
             if (!armedRef.current[band]) {
-              peakWhileDisarmedRef.current[band] = Math.max(peakWhileDisarmedRef.current[band] || 0, vel);
+              peakWhileDisarmedRef.current[band] = Math.max(
+                peakWhileDisarmedRef.current[band] || 0,
+                vel
+              );
               const peakWhileDisarmed = peakWhileDisarmedRef.current[band] || 0;
               if (
                 vel < releaseThreshold ||
-                (peakWhileDisarmed > 0 && vel < peakWhileDisarmed * AUDIO_TRIGGER_CONFIG.rearmOnDropRatio)
+                (peakWhileDisarmed > 0 &&
+                  vel < peakWhileDisarmed * AUDIO_TRIGGER_CONFIG.rearmOnDropRatio)
               ) {
                 armedRef.current[band] = true;
                 peakWhileDisarmedRef.current[band] = 0;
@@ -305,7 +351,10 @@ export function useDashboardAudioCapture({
 
           if (debugRef.current && now - lastDebugLevelsLogMsRef.current >= 1000) {
             lastDebugLevelsLogMsRef.current = now;
-            console.log("[AudioDebug] levels", { ...lastLevelsRef.current, peaksDb: { ...peaksDb } });
+            console.log("[AudioDebug] levels", {
+              ...lastLevelsRef.current,
+              peaksDb: { ...peaksDb },
+            });
           }
 
           const lastUi = lastLevelsUpdateMsRef.current;
@@ -317,7 +366,8 @@ export function useDashboardAudioCapture({
               if (prev.status === "error") return prev;
               if (prev.status === "mock") return prev;
               if (prev.status === "idle") return prev;
-              if (prev.status === "starting") return { status: "starting", levels: nextLevels, peaksDb: nextPeaksDb };
+              if (prev.status === "starting")
+                return { status: "starting", levels: nextLevels, peaksDb: nextPeaksDb };
               return { status: "running", levels: nextLevels, peaksDb: nextPeaksDb };
             });
           }
@@ -327,7 +377,11 @@ export function useDashboardAudioCapture({
           });
         };
 
-        setState({ status: "running", levels: lastLevelsRef.current, peaksDb: lastPeaksDbRef.current });
+        setState({
+          status: "running",
+          levels: lastLevelsRef.current,
+          peaksDb: lastPeaksDbRef.current,
+        });
         rafRef.current = requestAnimationFrame(() => {
           tick().catch(() => {});
         });
@@ -355,4 +409,3 @@ export function useDashboardAudioCapture({
 
   return state;
 }
-

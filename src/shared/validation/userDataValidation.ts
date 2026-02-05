@@ -68,6 +68,27 @@ function normalizeTrack(value: Jsonish): Jsonish | null {
     changed = true;
   };
 
+  const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
+  const clampInt = (n: number, min: number, max: number) => (n < min ? min : n > max ? max : n);
+  const normalizeThreshold = (v: unknown, fallback: number) => {
+    if (typeof v !== "number") return fallback;
+    if (!Number.isFinite(v)) return fallback;
+    return clamp01(v);
+  };
+  const normalizeIntervalMs = (v: unknown, fallback: number) => {
+    if (typeof v !== "number") return fallback;
+    if (!Number.isFinite(v)) return fallback;
+    const n = Math.round(v);
+    return clampInt(n, 0, 10_000);
+  };
+  const normalizeString = (v: unknown) => {
+    if (typeof v !== "string") return "";
+    const s = v.trim();
+    return s ? s : "";
+  };
+  const DEFAULT_THRESHOLD = 0.5;
+  const DEFAULT_MIN_INTERVAL_MS = 120;
+
   const { modules, changed: modulesChanged } = normalizeModules(out.modules);
   if (modulesChanged) {
     ensure();
@@ -102,6 +123,72 @@ function normalizeTrack(value: Jsonish): Jsonish | null {
       cm[key] = slot;
       valid.add(slot);
     }
+  }
+
+  const rawSignal = out.signal;
+  const signalObj = isPlainObject(rawSignal) ? (rawSignal as Record<string, Jsonish>) : null;
+  const rawAudio =
+    signalObj && isPlainObject(signalObj.audio)
+      ? (signalObj.audio as Record<string, Jsonish>)
+      : null;
+  const rawFile =
+    signalObj && isPlainObject(signalObj.file) ? (signalObj.file as Record<string, Jsonish>) : null;
+
+  const normalizeBandThresholds = (t: unknown) => {
+    const obj =
+      t && typeof t === "object" && !Array.isArray(t) ? (t as Record<string, unknown>) : null;
+    const low = normalizeThreshold(obj ? obj.low : undefined, DEFAULT_THRESHOLD);
+    const medium = normalizeThreshold(obj ? obj.medium : undefined, DEFAULT_THRESHOLD);
+    const high = normalizeThreshold(obj ? obj.high : undefined, DEFAULT_THRESHOLD);
+    return { low, medium, high };
+  };
+
+  const nextSignal = {
+    audio: {
+      thresholds: normalizeBandThresholds(rawAudio ? rawAudio.thresholds : undefined),
+      minIntervalMs: normalizeIntervalMs(
+        rawAudio ? rawAudio.minIntervalMs : undefined,
+        DEFAULT_MIN_INTERVAL_MS
+      ),
+    },
+    file: {
+      thresholds: normalizeBandThresholds(rawFile ? rawFile.thresholds : undefined),
+      minIntervalMs: normalizeIntervalMs(
+        rawFile ? rawFile.minIntervalMs : undefined,
+        DEFAULT_MIN_INTERVAL_MS
+      ),
+      assetRelPath: normalizeString(rawFile ? rawFile.assetRelPath : undefined),
+      assetName: normalizeString(rawFile ? rawFile.assetName : undefined),
+    },
+  };
+
+  const existingSignal = signalObj ? (signalObj as unknown) : null;
+  const needsSignal =
+    !signalObj ||
+    !isPlainObject(rawAudio) ||
+    !isPlainObject(rawFile) ||
+    !isPlainObject(rawAudio ? rawAudio.thresholds : null) ||
+    !isPlainObject(rawFile ? rawFile.thresholds : null) ||
+    (rawAudio ? rawAudio.minIntervalMs : undefined) !== nextSignal.audio.minIntervalMs ||
+    (rawFile ? rawFile.minIntervalMs : undefined) !== nextSignal.file.minIntervalMs ||
+    (rawFile ? rawFile.assetRelPath : undefined) !== nextSignal.file.assetRelPath ||
+    (rawFile ? rawFile.assetName : undefined) !== nextSignal.file.assetName ||
+    (rawAudio && isPlainObject(rawAudio.thresholds)
+      ? (rawAudio.thresholds as Record<string, unknown>).low !== nextSignal.audio.thresholds.low ||
+        (rawAudio.thresholds as Record<string, unknown>).medium !==
+          nextSignal.audio.thresholds.medium ||
+        (rawAudio.thresholds as Record<string, unknown>).high !== nextSignal.audio.thresholds.high
+      : true) ||
+    (rawFile && isPlainObject(rawFile.thresholds)
+      ? (rawFile.thresholds as Record<string, unknown>).low !== nextSignal.file.thresholds.low ||
+        (rawFile.thresholds as Record<string, unknown>).medium !==
+          nextSignal.file.thresholds.medium ||
+        (rawFile.thresholds as Record<string, unknown>).high !== nextSignal.file.thresholds.high
+      : true);
+
+  if (needsSignal) {
+    ensure();
+    out.signal = nextSignal as unknown as Jsonish;
   }
 
   return changed ? out : value;
@@ -154,10 +241,7 @@ function normalizeSet(value: Jsonish, index: number): Jsonish | null {
   return changed ? out : value;
 }
 
-export function sanitizeUserDataForBridge(
-  value: Jsonish,
-  defaultValue: Jsonish
-): Jsonish {
+export function sanitizeUserDataForBridge(value: Jsonish, defaultValue: Jsonish): Jsonish {
   const fallback = defaultUserData(defaultValue);
   if (!isPlainObject(value)) return fallback;
 
@@ -256,11 +340,7 @@ export function sanitizeUserDataForBridge(
 
   if (setsChanged) {
     ensure();
-    out.sets = setsOut.length
-      ? setsOut
-      : isArray(fallback.sets)
-      ? fallback.sets
-      : [];
+    out.sets = setsOut.length ? setsOut : isArray(fallback.sets) ? fallback.sets : [];
   }
 
   return changed ? out : value;

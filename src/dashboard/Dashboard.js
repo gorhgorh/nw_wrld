@@ -156,6 +156,26 @@ const Dashboard = () => {
 
   const isAudioMode = inputConfig?.type === "audio" && userData?.config?.sequencerMode !== true;
   const isFileMode = inputConfig?.type === "file" && userData?.config?.sequencerMode !== true;
+  const activeTrack = useMemo(() => {
+    if (!activeTrackId) return null;
+    const tracks = getActiveSetTracks(userData, activeSetId);
+    return tracks.find((t) => t && typeof t === "object" && t.id === activeTrackId) || null;
+  }, [activeTrackId, userData, activeSetId]);
+  const activeTrackSignal =
+    activeTrack &&
+    typeof activeTrack === "object" &&
+    activeTrack.signal &&
+    typeof activeTrack.signal === "object"
+      ? activeTrack.signal
+      : null;
+  const activeAudio =
+    activeTrackSignal && activeTrackSignal.audio && typeof activeTrackSignal.audio === "object"
+      ? activeTrackSignal.audio
+      : null;
+  const activeFile =
+    activeTrackSignal && activeTrackSignal.file && typeof activeTrackSignal.file === "object"
+      ? activeTrackSignal.file
+      : null;
   const { devices: availableAudioDevices, refresh: refreshAudioDevices } = useDashboardAudioDevices(
     Boolean(isAudioMode)
   );
@@ -170,25 +190,29 @@ const Dashboard = () => {
   const audioCaptureState = useDashboardAudioCapture({
     enabled: Boolean(isAudioMode),
     deviceId:
-      typeof inputConfig?.deviceId === "string" && inputConfig.deviceId ? inputConfig.deviceId : null,
+      typeof inputConfig?.deviceId === "string" && inputConfig.deviceId
+        ? inputConfig.deviceId
+        : null,
     emitBand: emitAudioBand,
     thresholds:
-      inputConfig && typeof inputConfig === "object" ? inputConfig.audioThresholds || null : null,
+      activeAudio && typeof activeAudio.thresholds === "object" ? activeAudio.thresholds : null,
     minIntervalMs:
-      inputConfig && typeof inputConfig === "object" ? inputConfig.audioMinIntervalMs ?? null : null,
+      activeAudio && typeof activeAudio.minIntervalMs === "number"
+        ? activeAudio.minIntervalMs
+        : null,
   });
 
   const fileAudio = useDashboardFileAudio({
     enabled: Boolean(isFileMode),
     assetRelPath:
-      inputConfig && typeof inputConfig === "object" && typeof inputConfig.fileAssetRelPath === "string" && inputConfig.fileAssetRelPath
-        ? inputConfig.fileAssetRelPath
+      activeFile && typeof activeFile.assetRelPath === "string" && activeFile.assetRelPath
+        ? activeFile.assetRelPath
         : null,
     emitBand: emitFileBand,
     thresholds:
-      inputConfig && typeof inputConfig === "object" ? inputConfig.fileThresholds || null : null,
+      activeFile && typeof activeFile.thresholds === "object" ? activeFile.thresholds : null,
     minIntervalMs:
-      inputConfig && typeof inputConfig === "object" ? inputConfig.fileMinIntervalMs ?? null : null,
+      activeFile && typeof activeFile.minIntervalMs === "number" ? activeFile.minIntervalMs : null,
   });
 
   const fileAudioIsPlayingRef = useRef(false);
@@ -224,6 +248,12 @@ const Dashboard = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFileMode]);
+
+  useEffect(() => {
+    if (!isFileMode) return;
+    if (!fileAudioIsPlayingRef.current) return;
+    fileAudioStopRef.current().catch(() => {});
+  }, [activeTrackId, isFileMode]);
 
   useInputEvents({
     userData,

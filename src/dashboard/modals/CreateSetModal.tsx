@@ -17,7 +17,9 @@ type CreateSetModalProps = {
 
 export const CreateSetModal = ({ isOpen, onClose, onAlert }: CreateSetModalProps) => {
   const [userData, setUserData] = useAtom(userDataAtom);
-  const [, setActiveTrackId] = useAtom(activeTrackIdAtom as unknown as PrimitiveAtom<string | null>);
+  const [, setActiveTrackId] = useAtom(
+    activeTrackIdAtom as unknown as PrimitiveAtom<string | number | null>
+  );
   const [, setActiveSetId] = useAtom(activeSetIdAtom as unknown as PrimitiveAtom<string | null>);
   const [setName, setSetName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -46,9 +48,7 @@ export const CreateSetModal = ({ isOpen, onClose, onAlert }: CreateSetModalProps
       const newSetId = `set_${Date.now()}`;
       updateUserData(setUserData, (draft: unknown) => {
         const d = draft as Record<string, unknown>;
-        const sets = Array.isArray(d.sets)
-          ? (d.sets as Array<Record<string, unknown>>)
-          : [];
+        const sets = Array.isArray(d.sets) ? (d.sets as Array<Record<string, unknown>>) : [];
         if (!Array.isArray(d.sets)) {
           d.sets = sets;
         }
@@ -112,4 +112,3 @@ export const CreateSetModal = ({ isOpen, onClose, onAlert }: CreateSetModalProps
     </Modal>
   );
 };
-
