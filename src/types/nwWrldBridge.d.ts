@@ -42,6 +42,9 @@ declare global {
               reconnect?: (device: unknown) => Promise<unknown>;
               noteOn?: (payload: unknown) => Promise<unknown>;
             };
+            audio?: {
+              emitBand?: (payload: unknown) => Promise<unknown>;
+            };
             file?: {
               emitBand?: (payload: unknown) => Promise<unknown>;
             };

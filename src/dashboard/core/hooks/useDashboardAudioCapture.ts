@@ -115,6 +115,8 @@ export function useDashboardAudioCapture({
         } catch {}
       }
       analyserRef.current = null;
+      armedRef.current = { low: true, medium: true, high: true };
+      lastEmitMsRef.current = { low: 0, medium: 0, high: 0 };
       peakWhileDisarmedRef.current = { low: 0, medium: 0, high: 0 };
       lastBandRmsLinRef.current = { low: 0, medium: 0, high: 0 };
       bandRmsPeakRef.current = { low: 0, medium: 0, high: 0 };
