@@ -12,6 +12,8 @@ import { EditChannelModal } from "../modals/EditChannelModal";
 import { ConfirmationModal } from "../modals/ConfirmationModal";
 import { ModuleEditorModal } from "./ModuleEditorModal";
 import { NewModuleDialog } from "./NewModuleDialog";
+import type { AudioCaptureState } from "../core/hooks/useDashboardAudioCapture";
+import type { FileAudioState } from "../core/hooks/useDashboardFileAudio";
 
 type Confirmation = { message: string; onConfirm?: () => void; type?: "confirm" | "alert" } | null;
 
@@ -46,7 +48,9 @@ type DashboardModalLayerProps = {
     updater: ((prev: Record<string, unknown>) => Record<string, unknown>) | Record<string, unknown>
   ) => void;
   recordingData: Record<string, unknown>;
-  setRecordingData: (updater: ((prev: Record<string, unknown>) => Record<string, unknown>) | Record<string, unknown>) => void;
+  setRecordingData: (
+    updater: ((prev: Record<string, unknown>) => Record<string, unknown>) | Record<string, unknown>
+  ) => void;
   activeTrackId: string | number | null;
   setActiveTrackId: (id: string | number | null) => void;
   activeSetId: string | null;
@@ -55,6 +59,10 @@ type DashboardModalLayerProps = {
   inputConfig: Record<string, unknown>;
   setInputConfig: (config: Record<string, unknown>) => void;
   availableMidiDevices: Array<{ id: string; name: string }>;
+  availableAudioDevices: Array<{ id: string; label: string }>;
+  refreshAudioDevices: () => Promise<void>;
+  audioCaptureState: AudioCaptureState;
+  fileAudioState: FileAudioState;
   settings: ProjectorSettings;
   aspectRatio: string;
   setAspectRatio: (ratio: string) => void;
@@ -88,7 +96,11 @@ type DashboardModalLayerProps = {
   workspaceModuleLoadFailures: string[];
   workspaceModuleSkipped: Array<{ file: string; reason: string }>;
 
-  editChannelModalState: { isOpen: boolean; trackIndex: number | null; channelNumber: number | null };
+  editChannelModalState: {
+    isOpen: boolean;
+    trackIndex: number | null;
+    channelNumber: number | null;
+  };
   setEditChannelModalState: (next: {
     isOpen: boolean;
     trackIndex: number | null;
@@ -133,6 +145,10 @@ export const DashboardModalLayer = ({
   inputConfig,
   setInputConfig,
   availableMidiDevices,
+  availableAudioDevices,
+  refreshAudioDevices,
+  audioCaptureState,
+  fileAudioState,
   settings,
   aspectRatio,
   setAspectRatio,
@@ -192,6 +208,8 @@ export const DashboardModalLayer = ({
         activeSetId={activeSetId}
         recordingData={recordingData}
         setRecordingData={setRecordingData}
+        audioCaptureState={audioCaptureState}
+        fileAudioState={fileAudioState}
         onCreateTrack={() => {
           setIsSelectTrackModalOpen(false);
           setIsCreateTrackOpen(true);
@@ -226,6 +244,9 @@ export const DashboardModalLayer = ({
         inputConfig={inputConfig}
         setInputConfig={setInputConfig}
         availableMidiDevices={availableMidiDevices}
+        availableAudioDevices={availableAudioDevices}
+        refreshAudioDevices={refreshAudioDevices}
+        audioCaptureState={audioCaptureState}
         onOpenMappings={() => {
           setIsSettingsModalOpen(false);
           setIsInputMappingsModalOpen(true);
@@ -238,6 +259,10 @@ export const DashboardModalLayer = ({
       <InputMappingsModal
         isOpen={isInputMappingsModalOpen}
         onClose={() => setIsInputMappingsModalOpen(false)}
+        onBackToSettings={() => {
+          setIsInputMappingsModalOpen(false);
+          setIsSettingsModalOpen(true);
+        }}
       />
       <ReleaseNotesModal isOpen={isReleaseNotesOpen} onClose={() => setIsReleaseNotesOpen(false)} />
       <AddModuleModal
@@ -322,4 +347,3 @@ export const DashboardModalLayer = ({
     </>
   );
 };
-
