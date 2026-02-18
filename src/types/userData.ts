@@ -1,4 +1,4 @@
-type InputType = "midi" | "osc" | "audio" | "file";
+export type InputType = "midi" | "osc" | "audio" | "file" | "websocket";
 
 export type NoteMatchMode = "pitchClass" | "exactNote";
 

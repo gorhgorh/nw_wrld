@@ -1,5 +1,6 @@
 import { WebMidi, type Input as WebMidiInput } from "webmidi";
 import { UDPPort, type OscMessage, type OscError } from "osc";
+import { WebSocketServer, type WebSocket as WsWebSocket } from "ws";
 import { isValidOSCChannelAddress, isValidOSCTrackAddress } from "../shared/validation/oscValidation";
 import { normalizeInputEventPayload } from "../shared/validation/inputEventValidation";
 import type {
@@ -18,6 +19,12 @@ const DEFAULT_INPUT_CONFIG = {
   velocitySensitive: false,
   noteMatchMode: "pitchClass",
   port: 8000,
+};
+
+// Default ports per source type so secondary sources don't collide
+const DEFAULT_PORT_BY_TYPE: Record<string, number> = {
+  osc: 8000,
+  websocket: 8080,
 };
 
 const INPUT_STATUS: {
@@ -53,11 +60,17 @@ type RuntimeFileConfig = Omit<InputConfig, "type"> & {
   noteMatchMode?: string;
 };
 
+type RuntimeWebSocketConfig = Omit<InputConfig, "type"> & {
+  type: "websocket";
+  noteMatchMode?: string;
+};
+
 type RuntimeInputConfig =
   | RuntimeMidiConfig
   | RuntimeOscConfig
   | RuntimeAudioConfig
-  | RuntimeFileConfig;
+  | RuntimeFileConfig
+  | RuntimeWebSocketConfig;
 
 type WindowWebContents = {
   isDestroyed(): boolean;
@@ -71,12 +84,12 @@ type WindowLike = {
   webContents?: WindowWebContents | null;
 };
 
-type CurrentSource =
+type ActiveSource =
   | { type: "midi"; instance: WebMidiInput }
   | { type: "osc"; instance: UDPPort }
   | { type: "audio"; instance: { close?: () => unknown } }
   | { type: "file"; instance: { close?: () => unknown } }
-  | null;
+  | { type: "websocket"; instance: WebSocketServer };
 
 type WebMidiProvider = typeof WebMidi;
 
@@ -134,29 +147,42 @@ const enableWebMidi = (webMidi: WebMidiProvider): Promise<void> => {
   return promise;
 };
 
+const RECONCILABLE_SOURCES = new Set(["midi", "osc", "websocket"]);
+
 class InputManager {
   dashboard: WindowLike | null;
   projector: WindowLike | null;
-  currentSource: CurrentSource;
+  activeSources: Map<string, ActiveSource>;
   config: RuntimeInputConfig | null;
   connectionStatus: InputStatus;
+  defaultSourceType: string;
   private midiWebMidi: WebMidiProvider | null;
   private midiConnectedHandler: ((e: unknown) => void) | null;
   private midiDisconnectedHandler: ((e: unknown) => void) | null;
   private midiTargetDeviceId: string;
   private midiTargetDeviceName: string;
+  private ensureInFlight: Map<string, Promise<void>>;
+  private moduleNeededSources: Set<string>;
 
   constructor(dashboardWindow: WindowLike, projectorWindow: WindowLike) {
     this.dashboard = dashboardWindow;
     this.projector = projectorWindow;
-    this.currentSource = null;
+    this.activeSources = new Map();
     this.config = null;
     this.connectionStatus = INPUT_STATUS.DISCONNECTED;
+    this.defaultSourceType = "midi";
     this.midiWebMidi = null;
     this.midiConnectedHandler = null;
     this.midiDisconnectedHandler = null;
     this.midiTargetDeviceId = "";
     this.midiTargetDeviceName = "";
+    this.ensureInFlight = new Map();
+    this.moduleNeededSources = new Set();
+  }
+
+  // Backward-compat: expose currentSource as the default source entry
+  get currentSource(): ActiveSource | null {
+    return this.activeSources.get(this.defaultSourceType) || null;
   }
 
   private teardownMidiWebMidiListeners() {
@@ -197,25 +223,24 @@ class InputManager {
 
     this.midiDisconnectedHandler = (evt: unknown) => {
       if (!matchesTarget(evt)) return;
-      if (!this.config || (this.config as RuntimeInputConfig).type !== "midi") return;
-      if (!this.currentSource || this.currentSource.type !== "midi") return;
+      const midiSource = this.activeSources.get("midi");
+      if (!midiSource || midiSource.type !== "midi") return;
       try {
-        this.currentSource.instance.removeListener();
+        midiSource.instance.removeListener();
       } catch {
         try {
-          this.currentSource.instance.removeListener("noteon");
+          midiSource.instance.removeListener("noteon");
         } catch {}
       }
-      this.currentSource = null;
+      this.activeSources.delete("midi");
       this.broadcastStatus(INPUT_STATUS.DISCONNECTED, `MIDI device disconnected: ${deviceName}`);
     };
 
     this.midiConnectedHandler = (evt: unknown) => {
       if (!matchesTarget(evt)) return;
-      if (!this.config || (this.config as RuntimeInputConfig).type !== "midi") return;
       if (this.connectionStatus === INPUT_STATUS.CONNECTING) return;
-      if (this.currentSource && this.currentSource.type === "midi") return;
-      this.initialize(this.config as RuntimeInputConfig).catch(() => {});
+      if (this.activeSources.has("midi")) return;
+      this.ensureSource("midi").catch(() => {});
     };
 
     try {
@@ -237,7 +262,6 @@ class InputManager {
 
     const normalized = normalizeInputEventPayload(payload);
     if (!normalized) {
-      console.warn("[InputManager] Invalid input-event payload:", payload);
       return;
     }
 
@@ -261,12 +285,14 @@ class InputManager {
 
   broadcastStatus(status: InputStatus, message = "") {
     this.connectionStatus = status;
+    const activeTypes = Array.from(this.activeSources.keys());
     const statusPayload: InputStatusPayload = {
       type: "input-status",
       data: {
         status,
-        message,
+        message: message || (activeTypes.length > 0 ? `Active: ${activeTypes.join(", ")}` : ""),
         config: this.config,
+        activeSources: activeTypes,
       },
     };
 
@@ -281,19 +307,30 @@ class InputManager {
   }
 
   async initialize(inputConfig?: RuntimeInputConfig | null) {
-    if (this.currentSource) {
-      await this.disconnect();
-    }
-
     const config = (inputConfig || DEFAULT_INPUT_CONFIG) as RuntimeInputConfig;
+    const prevDefault = this.defaultSourceType;
 
     this.config = config;
+    this.defaultSourceType = config.type;
 
     try {
       this.broadcastStatus(
         INPUT_STATUS.CONNECTING,
         `Connecting to ${config.type}...`
       );
+
+      // Only stop the default source so it can be (re)started with new config.
+      // Secondary sources managed by reconcileSources are left untouched.
+      if (this.activeSources.has(config.type)) {
+        await this.stopSource(config.type);
+      }
+      // If the old default was a different type, stop it too
+      // UNLESS a module still needs it (moduleNeededSources is populated by reconcileSources)
+      if (prevDefault !== config.type && this.activeSources.has(prevDefault)) {
+        if (!this.moduleNeededSources.has(prevDefault)) {
+          await this.stopSource(prevDefault);
+        }
+      }
 
       const inputType =
         typeof (config as { type?: string }).type === "string"
@@ -313,6 +350,9 @@ class InputManager {
         case "file":
           await this.initFile(config as RuntimeFileConfig);
           break;
+        case "websocket":
+          await this.initWebSocket(config as RuntimeWebSocketConfig);
+          break;
         default:
           console.warn("[InputManager] Unknown input type:", inputType);
           this.broadcastStatus(
@@ -326,6 +366,132 @@ class InputManager {
       this.broadcastStatus(INPUT_STATUS.ERROR, message);
       throw error;
     }
+  }
+
+  /** Idempotent: start a source if not already running. No-op if already in activeSources. */
+  async ensureSource(type: string): Promise<void> {
+    if (this.activeSources.has(type)) return;
+
+    // Avoid duplicate concurrent starts
+    const inFlight = this.ensureInFlight.get(type);
+    if (inFlight) return inFlight;
+
+    const config = (this.config || DEFAULT_INPUT_CONFIG) as RuntimeInputConfig;
+    // Use type-specific default port so secondary sources don't collide with main
+    const defaultPort = DEFAULT_PORT_BY_TYPE[type];
+    const portOverride = (type !== config.type && defaultPort) ? { port: defaultPort } : {};
+    const sourceConfig = { ...config, ...portOverride, type } as RuntimeInputConfig;
+
+    const promise = (async () => {
+      try {
+        switch (type) {
+          case "midi":
+            await this.initMIDI(sourceConfig as RuntimeMidiConfig);
+            break;
+          case "osc":
+            await this.initOSC(sourceConfig as RuntimeOscConfig);
+            break;
+          case "websocket":
+            await this.initWebSocket(sourceConfig as RuntimeWebSocketConfig);
+            break;
+          case "audio":
+            await this.initAudio(sourceConfig as RuntimeAudioConfig);
+            break;
+          case "file":
+            await this.initFile(sourceConfig as RuntimeFileConfig);
+            break;
+          default:
+            console.warn("[InputManager] ensureSource: unknown type:", type);
+        }
+      } catch (err) {
+        console.error(`[InputManager] ensureSource(${type}) failed:`, err);
+      } finally {
+        this.ensureInFlight.delete(type);
+      }
+    })();
+
+    this.ensureInFlight.set(type, promise);
+    return promise;
+  }
+
+  /** Tear down a single source by type. */
+  async stopSource(type: string): Promise<void> {
+    const source = this.activeSources.get(type);
+    if (!source) return;
+
+    try {
+      switch (source.type) {
+        case "midi":
+          this.teardownMidiWebMidiListeners();
+          try {
+            source.instance.removeListener();
+          } catch {
+            try { source.instance.removeListener("noteon"); } catch {}
+          }
+          break;
+        case "osc":
+          if (source.instance) source.instance.close();
+          break;
+        case "audio":
+        case "file":
+          if (source.instance && typeof source.instance.close === "function") {
+            try { source.instance.close(); } catch {}
+          }
+          break;
+        case "websocket":
+          if (source.instance) {
+            try { source.instance.close(); } catch {}
+          }
+          break;
+      }
+    } catch (err) {
+      console.error(`[InputManager] stopSource(${type}) error:`, err);
+    }
+
+    this.activeSources.delete(type);
+    console.log(`[InputManager] stopped source: ${type}`);
+  }
+
+  /**
+   * Reconcile active sources with what modules need.
+   * Starts missing sources, stops sources no module needs (except default + audio/file).
+   */
+  async reconcileSources(neededSources: string[]): Promise<void> {
+    // Guard: don't reconcile before initialize() has been called
+    if (!this.config) return;
+
+    // Remember what modules need so initialize() won't kill these sources
+    this.moduleNeededSources = new Set(neededSources.filter((s) => RECONCILABLE_SOURCES.has(s)));
+
+    const needed = new Set<string>();
+    // Always keep the default source type
+    needed.add(this.defaultSourceType);
+    // Also keep the configured input type (belt-and-suspenders)
+    if (this.config.type) needed.add(this.config.type);
+    // Add module-requested sources (only reconcilable ones)
+    for (const s of neededSources) {
+      if (RECONCILABLE_SOURCES.has(s)) needed.add(s);
+    }
+
+    // Start missing sources
+    const startPromises: Promise<void>[] = [];
+    for (const type of needed) {
+      if (!this.activeSources.has(type)) {
+        startPromises.push(this.ensureSource(type));
+      }
+    }
+    if (startPromises.length > 0) {
+      await Promise.allSettled(startPromises);
+    }
+
+    // Stop sources that are no longer needed (only reconcilable ones)
+    for (const type of this.activeSources.keys()) {
+      if (!needed.has(type) && RECONCILABLE_SOURCES.has(type)) {
+        await this.stopSource(type);
+      }
+    }
+
+    this.broadcastStatus(INPUT_STATUS.CONNECTED);
   }
 
   async initMIDI(midiConfig: RuntimeMidiConfig) {
@@ -355,7 +521,6 @@ class InputManager {
               `MIDI device "${midiConfig.deviceName}" not found`
             );
             console.error("[InputManager]", error.message);
-            this.currentSource = null;
             this.broadcastStatus(INPUT_STATUS.DISCONNECTED, "");
             return reject(error);
           }
@@ -401,7 +566,7 @@ class InputManager {
             }
           });
 
-          this.currentSource = { type: "midi", instance: input };
+          this.activeSources.set("midi", { type: "midi", instance: input });
           this.broadcastStatus(
             INPUT_STATUS.CONNECTED,
             `MIDI: ${resolvedName || midiConfig.deviceName}`
@@ -411,7 +576,6 @@ class InputManager {
           const message =
             error instanceof Error ? error.message : String(error);
           console.error("[InputManager] Error in MIDI setup:", error);
-          this.currentSource = null;
           this.broadcastStatus(INPUT_STATUS.ERROR, `MIDI error: ${message}`);
           reject(error);
         }
@@ -426,7 +590,6 @@ class InputManager {
           .catch((err) => {
             const e = err instanceof Error ? err : new Error(String(err));
             console.error("[InputManager] MIDI enable failed:", e);
-            this.currentSource = null;
             this.broadcastStatus(INPUT_STATUS.ERROR, `Failed to enable MIDI: ${e.message}`);
             return reject(e);
           });
@@ -499,12 +662,11 @@ class InputManager {
 
       console.log(`[InputManager] 🔌 Opening UDP port ${port}...`);
       udpPort.open();
-      this.currentSource = { type: "osc", instance: udpPort };
+      this.activeSources.set("osc", { type: "osc", instance: udpPort });
       console.log(`[InputManager] ✅ UDP port opened successfully`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[InputManager] ❌ Failed to initialize OSC:`, err);
-      this.currentSource = null;
       this.broadcastStatus(
         INPUT_STATUS.ERROR,
         `Failed to start OSC: ${message}`
@@ -513,67 +675,106 @@ class InputManager {
   }
 
   async initAudio(_audioConfig: RuntimeAudioConfig) {
-    this.currentSource = { type: "audio", instance: {} };
+    this.activeSources.set("audio", { type: "audio", instance: {} });
     this.broadcastStatus(INPUT_STATUS.CONNECTED, "Audio (listening)");
   }
 
   async initFile(_fileConfig: RuntimeFileConfig) {
-    this.currentSource = { type: "file", instance: {} };
+    this.activeSources.set("file", { type: "file", instance: {} });
     this.broadcastStatus(INPUT_STATUS.CONNECTED, "File (ready)");
+  }
+
+  async initWebSocket(wsConfig: RuntimeWebSocketConfig) {
+    const port = wsConfig.port || 8080;
+
+    try {
+      const wss = new WebSocketServer({ port });
+
+      wss.on("listening", () => {
+        this.broadcastStatus(INPUT_STATUS.CONNECTED, `WebSocket: Port ${port}`);
+      });
+
+      wss.on("connection", (ws: WsWebSocket) => {
+        console.log("[InputManager] [WS] client connected");
+        ws.on("close", () => console.log("[InputManager] [WS] client disconnected"));
+        ws.on("message", (raw: Buffer | string) => {
+          const text = typeof raw === "string" ? raw : raw.toString("utf-8");
+          console.log("[InputManager] [WS] raw message:", text);
+          let msg: Record<string, unknown>;
+          try {
+            msg = JSON.parse(text);
+          } catch {
+            console.warn("[InputManager] [WS] invalid JSON, ignoring");
+            return;
+          }
+          if (!msg || typeof msg !== "object") {
+            console.warn("[InputManager] [WS] not an object, ignoring");
+            return;
+          }
+
+          const msgType = typeof msg.type === "string" ? msg.type : "";
+          const address = typeof msg.address === "string" ? msg.address.replace(/\s+/g, "") : "";
+          if (!address) {
+            console.warn("[InputManager] [WS] no address field, ignoring");
+            return;
+          }
+
+          console.log("[InputManager] [WS] parsed — type:", msgType || "(none)", "address:", address);
+
+          if (msgType === "track" || isValidOSCTrackAddress(address)) {
+            console.log("[InputManager] [WS] -> track-selection, identifier:", address);
+            this.broadcast("track-selection", {
+              identifier: address,
+              source: "websocket",
+              address,
+            });
+            return;
+          }
+
+          if (msgType === "channel" || isValidOSCChannelAddress(address)) {
+            const velocity = typeof msg.velocity === "number" && Number.isFinite(msg.velocity)
+              ? msg.velocity
+              : 127;
+            console.log("[InputManager] [WS] -> method-trigger, channelName:", address, "velocity:", velocity);
+            this.broadcast("method-trigger", {
+              channelName: address,
+              velocity,
+              source: "websocket",
+              address,
+            });
+            return;
+          }
+
+          console.warn("[InputManager] [WS] address not recognized as track or channel:", address);
+        });
+      });
+
+      wss.on("error", (err: Error) => {
+        console.error("[InputManager] WebSocket error:", err);
+        this.broadcastStatus(INPUT_STATUS.ERROR, `WebSocket error: ${err.message}`);
+      });
+
+      this.activeSources.set("websocket", { type: "websocket", instance: wss });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[InputManager] Failed to initialize WebSocket:", err);
+      this.broadcastStatus(
+        INPUT_STATUS.ERROR,
+        `Failed to start WebSocket: ${message}`
+      );
+    }
   }
 
   async disconnect() {
     try {
-      if (this.currentSource) {
-        switch (this.currentSource.type) {
-          case "midi":
-            this.teardownMidiWebMidiListeners();
-            if (this.currentSource.instance) {
-              try {
-                this.currentSource.instance.removeListener();
-              } catch {
-                this.currentSource.instance.removeListener("noteon");
-              }
-            }
-            const webMidi = getWebMidiProvider();
-            if (webMidi.enabled && typeof webMidi.disable === "function") {
-              try {
-                await webMidi.disable();
-              } catch {
-                try {
-                  webMidi.disable();
-                } catch {}
-              }
-            }
-            break;
-          case "osc":
-            if (this.currentSource.instance) {
-              this.currentSource.instance.close();
-            }
-            break;
-          case "audio":
-            if (this.currentSource.instance && typeof this.currentSource.instance.close === "function") {
-              try {
-                this.currentSource.instance.close();
-              } catch {}
-            }
-            break;
-          case "file":
-            if (this.currentSource.instance && typeof this.currentSource.instance.close === "function") {
-              try {
-                this.currentSource.instance.close();
-              } catch {}
-            }
-            break;
-        }
+      const types = Array.from(this.activeSources.keys());
+      for (const type of types) {
+        await this.stopSource(type);
       }
-
       this.broadcastStatus(INPUT_STATUS.DISCONNECTED, "");
     } catch (error) {
       console.error("[InputManager] Error during disconnect:", error);
     }
-
-    this.currentSource = null;
   }
 
   static getAvailableMIDIDevices() {

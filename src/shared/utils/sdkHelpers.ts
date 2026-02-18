@@ -54,6 +54,32 @@ export const createSdkHelpers = (
     }
   };
 
-  return { assetUrl, readText, loadJson };
+  const tween = (
+    from: unknown,
+    to: unknown,
+    duration: unknown,
+    easing: unknown,
+    onUpdate: unknown
+  ): unknown => {
+    const tweenHelperFn = (globalThis as Record<string, unknown>).__nwWrldTweenHelper;
+    if (typeof tweenHelperFn !== "function") return null;
+    try {
+      return tweenHelperFn(from, to, duration, easing, onUpdate);
+    } catch {
+      return null;
+    }
+  };
+
+  const resolveEasingFn = (name: unknown): unknown => {
+    const fn = (globalThis as Record<string, unknown>).__nwWrldResolveEasing;
+    if (typeof fn !== "function") return null;
+    try {
+      return fn(name);
+    } catch {
+      return null;
+    }
+  };
+
+  return { assetUrl, readText, loadJson, tween, resolveEasing: resolveEasingFn };
 };
 

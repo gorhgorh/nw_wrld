@@ -13,7 +13,7 @@ import { getActiveSetTracks } from "../../shared/utils/setUtils";
 import { HELP_TEXT } from "../../shared/helpText";
 import { useNameValidation } from "../core/hooks/useNameValidation";
 import { useTrackSlots } from "../core/hooks/useTrackSlots";
-import { parsePitchClass, pitchClassToName } from "../../shared/midi/midiUtils";
+import { parsePitchClass, pitchClassToName, resolveChannelTrigger } from "../../shared/midi/midiUtils";
 import type { AudioCaptureState } from "../core/hooks/useDashboardAudioCapture";
 import type { FileAudioState } from "../core/hooks/useDashboardFileAudio";
 
@@ -51,6 +51,12 @@ export const EditTrackModal = ({
   const [fileAssetRelPath, setFileAssetRelPath] = useState("");
   const [fileAssetName, setFileAssetName] = useState("");
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+
+  type ModuleTransportState = {
+    inputSource: string; // "" = global default, "midi" | "osc" | "websocket"
+    inputMappings: Record<string, string>; // channelNumber → trigger value
+  };
+  const [moduleTransports, setModuleTransports] = useState<Record<string, ModuleTransportState>>({});
 
   type Band = "low" | "medium" | "high";
   const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
@@ -143,6 +149,7 @@ export const EditTrackModal = ({
       setFileAssetRelPath("");
       setFileAssetName("");
       setFileUploadError(null);
+      setModuleTransports({});
     } else if (track) {
       setTrackName(typeof track.name === "string" ? track.name : "");
       setTrackSlot(typeof track.trackSlot === "number" ? track.trackSlot : 1);
@@ -181,6 +188,26 @@ export const EditTrackModal = ({
       setFileAssetRelPath(typeof file.assetRelPath === "string" ? file.assetRelPath : "");
       setFileAssetName(typeof file.assetName === "string" ? file.assetName : "");
       setFileUploadError(null);
+
+      // Initialize per-module transport state
+      const modules = Array.isArray(track.modules) ? (track.modules as unknown[]) : [];
+      const transports: Record<string, ModuleTransportState> = {};
+      for (const mod of modules) {
+        const m = mod && typeof mod === "object" ? (mod as Record<string, unknown>) : null;
+        if (!m || !m.id || typeof m.id !== "string") continue;
+        const src = typeof m.inputSource === "string" ? m.inputSource : "";
+        const rawMappings = m.inputMappings && typeof m.inputMappings === "object" && !Array.isArray(m.inputMappings)
+          ? (m.inputMappings as Record<string, unknown>)
+          : {};
+        const mappings: Record<string, string> = {};
+        for (const [k, v] of Object.entries(rawMappings)) {
+          if (typeof v === "string" || typeof v === "number") {
+            mappings[k] = String(v);
+          }
+        }
+        transports[m.id] = { inputSource: src, inputMappings: mappings };
+      }
+      setModuleTransports(transports);
     }
   }, [isOpen, track]);
 
@@ -312,6 +339,55 @@ export const EditTrackModal = ({
         changed = true;
       }
 
+      // Persist per-module transport settings
+      const modules = Array.isArray(t.modules) ? (t.modules as Record<string, unknown>[]) : [];
+      for (const mod of modules) {
+        const mId = typeof mod.id === "string" ? mod.id : null;
+        if (!mId) continue;
+        const transport = moduleTransports[mId];
+        if (!transport) continue;
+
+        const prevSource = typeof mod.inputSource === "string" ? mod.inputSource : "";
+        const prevMappings = mod.inputMappings && typeof mod.inputMappings === "object"
+          ? mod.inputMappings as Record<string, unknown>
+          : null;
+
+        if (transport.inputSource) {
+          if (mod.inputSource !== transport.inputSource) {
+            mod.inputSource = transport.inputSource;
+            changed = true;
+          }
+          // Persist non-empty inputMappings
+          const hasEntries = Object.keys(transport.inputMappings).some((k) => transport.inputMappings[k] !== "");
+          if (hasEntries) {
+            const cleaned: Record<string, string | number> = {};
+            for (const [k, v] of Object.entries(transport.inputMappings)) {
+              if (v !== "") {
+                const numVal = transport.inputSource === "midi" ? parseInt(v, 10) : NaN;
+                cleaned[k] = Number.isFinite(numVal) ? numVal : v;
+              }
+            }
+            const prevStr = prevMappings ? JSON.stringify(prevMappings) : "";
+            if (JSON.stringify(cleaned) !== prevStr) {
+              mod.inputMappings = cleaned;
+              changed = true;
+            }
+          } else if (prevMappings) {
+            delete mod.inputMappings;
+            changed = true;
+          }
+        } else {
+          if (prevSource) {
+            delete mod.inputSource;
+            changed = true;
+          }
+          if (prevMappings) {
+            delete mod.inputMappings;
+            changed = true;
+          }
+        }
+      }
+
       if (!changed) return;
     });
   }, [
@@ -327,6 +403,7 @@ export const EditTrackModal = ({
     fileThresholds.high,
     fileThresholds.low,
     fileThresholds.medium,
+    moduleTransports,
     setUserData,
     track,
     trackIndex,
@@ -370,6 +447,7 @@ export const EditTrackModal = ({
     fileThresholds.low,
     fileThresholds.medium,
     isOpen,
+    moduleTransports,
     persistTrackChanges,
     track,
     trackName,
@@ -443,6 +521,201 @@ export const EditTrackModal = ({
             </div>
           ) : null}
         </div>
+
+        {/* Per-Module Transport Settings */}
+        {track && Array.isArray(track.modules) && (track.modules as unknown[]).filter((m) => {
+          const mm = m && typeof m === "object" ? (m as Record<string, unknown>) : null;
+          return mm && mm.id && mm.disabled !== true;
+        }).length > 0 && (
+          <div className="pt-2 border-t border-neutral-800">
+            <div className="opacity-50 mb-2 text-[11px]">Module Input Sources</div>
+            <div className="flex flex-col gap-3">
+              {(track.modules as unknown[]).map((mod) => {
+                const m = mod && typeof mod === "object" ? (mod as Record<string, unknown>) : null;
+                if (!m || !m.id || typeof m.id !== "string" || m.disabled === true) return null;
+                const mId = m.id;
+                const mType = typeof m.type === "string" ? m.type : "unknown";
+                const transport = moduleTransports[mId] || { inputSource: "", inputMappings: {} };
+                const transportSource = transport.inputSource;
+                const sourceLabel = transportSource
+                  ? transportSource === "midi" ? "MIDI" : transportSource === "osc" ? "OSC" : "WebSocket"
+                  : "Global Default";
+
+                // Find which channels this module has methods on
+                const modulesData = track.modulesData && typeof track.modulesData === "object"
+                  ? (track.modulesData as Record<string, unknown>)
+                  : {};
+                const modData = modulesData[mId] && typeof modulesData[mId] === "object"
+                  ? (modulesData[mId] as Record<string, unknown>)
+                  : {};
+                const methods = modData.methods && typeof modData.methods === "object"
+                  ? Object.keys(modData.methods as Record<string, unknown>).filter((k) => /^\d+$/.test(k)).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                  : [];
+
+                // Resolve the effective source type for trigger display
+                const effectiveSource = transportSource || inputType;
+
+                // Format a trigger value for display
+                const formatTriggerDisplay = (trigger: unknown, srcType: string) => {
+                  if (trigger === "" || trigger === null || trigger === undefined) return null;
+                  if (srcType === "midi") {
+                    const pc = typeof trigger === "number" ? trigger : parsePitchClass(trigger);
+                    if (pc !== null) {
+                      const name = pitchClassToName(pc);
+                      return name || String(pc);
+                    }
+                    return String(trigger);
+                  }
+                  return String(trigger);
+                };
+
+                return (
+                  <div key={mId} className="bg-neutral-900 rounded px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-[11px] text-neutral-300 font-mono">{mType}</div>
+                      <div className="text-[9px] text-neutral-500">{sourceLabel}</div>
+                    </div>
+                    <Select
+                      value={transportSource}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const prev = moduleTransports[mId];
+                        const prevSource = prev?.inputSource || "";
+                        // Clear overrides when transport type changes
+                        const keepMappings = val && val === prevSource;
+                        setModuleTransports((prev) => ({
+                          ...prev,
+                          [mId]: {
+                            ...prev[mId],
+                            inputSource: val,
+                            inputMappings: keepMappings ? (prev[mId]?.inputMappings || {}) : {},
+                          },
+                        }));
+                      }}
+                      className="w-full py-1 font-mono text-[11px]"
+                      data-testid={`module-transport-${mId}`}
+                    >
+                      <option value="" className="bg-[#101010]">Global Default</option>
+                      <option value="midi" className="bg-[#101010]">MIDI</option>
+                      <option value="osc" className="bg-[#101010]">OSC</option>
+                      <option value="websocket" className="bg-[#101010]">WebSocket</option>
+                    </Select>
+
+                    {transportSource && methods.length > 0 && (
+                      <div className="mt-2 flex flex-col gap-1">
+                        <div className="text-[10px] opacity-40 mb-1">
+                          Channel Triggers
+                        </div>
+                        {methods.map((ch) => {
+                          // Get the channel's slot number from track.channelMappings
+                          const chMappings = track.channelMappings && typeof track.channelMappings === "object"
+                            ? (track.channelMappings as Record<string, unknown>)
+                            : {};
+                          const slotNumber = chMappings[ch];
+
+                          // Resolve the global trigger for this channel
+                          const globalTrigger = resolveChannelTrigger(slotNumber, effectiveSource, globalMappings);
+                          const globalLabel = formatTriggerDisplay(globalTrigger, effectiveSource);
+
+                          const mappingVal = transport.inputMappings[ch] || "";
+                          const hasOverride = mappingVal !== "";
+                          const placeholder = transportSource === "midi"
+                            ? "note #"
+                            : "address";
+
+                          return (
+                            <div key={ch} className="flex flex-col gap-0.5">
+                              <div className="grid grid-cols-[50px_1fr_auto] gap-2 items-center">
+                                <div className="text-[10px] opacity-50">Ch {ch}</div>
+                                <div className="text-[10px] text-blue-500/70">
+                                  {hasOverride ? (
+                                    <span className="text-neutral-500 line-through">{globalLabel || "—"}</span>
+                                  ) : (
+                                    globalLabel || <span className="text-neutral-600">—</span>
+                                  )}
+                                  {hasOverride && (
+                                    <span className="text-blue-500 ml-1">{mappingVal}</span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                                    hasOverride
+                                      ? "bg-blue-500/20 text-blue-400"
+                                      : "bg-neutral-800 text-neutral-500 hover:text-neutral-300"
+                                  }`}
+                                  onClick={() => {
+                                    if (hasOverride) {
+                                      // Clear override
+                                      setModuleTransports((prev) => ({
+                                        ...prev,
+                                        [mId]: {
+                                          ...prev[mId],
+                                          inputMappings: {
+                                            ...(prev[mId]?.inputMappings || {}),
+                                            [ch]: "",
+                                          },
+                                        },
+                                      }));
+                                    } else {
+                                      // Set override to current global value as starting point
+                                      setModuleTransports((prev) => ({
+                                        ...prev,
+                                        [mId]: {
+                                          ...prev[mId],
+                                          inputMappings: {
+                                            ...(prev[mId]?.inputMappings || {}),
+                                            [ch]: globalLabel || "",
+                                          },
+                                        },
+                                      }));
+                                    }
+                                  }}
+                                  data-testid={`module-override-toggle-${mId}-${ch}`}
+                                >
+                                  {hasOverride ? "CLEAR" : "OVERRIDE"}
+                                </button>
+                              </div>
+                              {hasOverride && (
+                                <div className="grid grid-cols-[50px_1fr] gap-2 items-center">
+                                  <div />
+                                  <TextInput
+                                    value={mappingVal}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setModuleTransports((prev) => ({
+                                        ...prev,
+                                        [mId]: {
+                                          ...prev[mId],
+                                          inputMappings: {
+                                            ...(prev[mId]?.inputMappings || {}),
+                                            [ch]: val,
+                                          },
+                                        },
+                                      }));
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className="py-0.5 text-[10px]"
+                                    placeholder={placeholder}
+                                    data-testid={`module-mapping-${mId}-${ch}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {(isAudioMode || isFileMode) && (
           <div className="pt-2 border-t border-neutral-800">

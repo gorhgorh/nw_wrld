@@ -1,6 +1,7 @@
 import ModuleBase from "./helpers/moduleBase";
 import BaseThreeJsModule from "./helpers/threeBase";
 import * as THREE from "three";
+import TWEEN from "@tweenjs/tween.js";
 import p5 from "p5";
 import * as d3 from "d3";
 import { Noise } from "noisejs";
@@ -12,6 +13,7 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { parseNwWrldDocblockMetadata } from "../shared/nwWrldDocblock";
 import { buildMethodOptions, parseMatrixOptions } from "../shared/utils/methodOptions";
 import { createSdkHelpers } from "../shared/utils/sdkHelpers";
+import { resolveEasing, tweenHelper, SUPPORTED_EASINGS } from "./helpers/easingUtils";
 import {
   buildWorkspaceImportPreamble,
   ensureTrailingSlash,
@@ -20,6 +22,7 @@ import {
 } from "../shared/validation/sandboxModuleUtils";
 
 if (!globalThis.THREE) globalThis.THREE = THREE;
+if (!globalThis.TWEEN) globalThis.TWEEN = TWEEN;
 if (!globalThis.p5) globalThis.p5 = p5;
 if (!globalThis.d3) globalThis.d3 = d3;
 if (!globalThis.Noise) globalThis.Noise = Noise;
@@ -29,6 +32,11 @@ if (!globalThis.PCDLoader) globalThis.PCDLoader = PCDLoader;
 if (!globalThis.GLTFLoader) globalThis.GLTFLoader = GLTFLoader;
 if (!globalThis.STLLoader) globalThis.STLLoader = STLLoader;
 
+// Expose tween helpers for SDK
+(globalThis as Record<string, unknown>).__nwWrldTweenHelper = tweenHelper;
+(globalThis as Record<string, unknown>).__nwWrldResolveEasing = resolveEasing;
+(globalThis as Record<string, unknown>).__nwWrldSupportedEasings = SUPPORTED_EASINGS;
+
 const MODULE_METADATA_MAX_BYTES = 16 * 1024;
 
 const TOKEN =
@@ -37,12 +45,13 @@ const TOKEN =
     .__NW_WRLD_SANDBOX_TOKEN__ ||
   null;
 
-const injectWorkspaceModuleImports = (moduleId, sourceText) => {
+const injectWorkspaceModuleImports = (moduleId, sourceText, skipSafetyCheckFor?: Set<string>) => {
   if (typeof parseNwWrldDocblockMetadata !== "function") {
     throw new Error(`[Sandbox] Docblock parser is unavailable.`);
   }
   const meta = parseNwWrldDocblockMetadata(sourceText, MODULE_METADATA_MAX_BYTES);
-  const preamble = buildWorkspaceImportPreamble(moduleId, meta?.imports);
+  const additional = userImportNames.size > 0 ? userImportNames : undefined;
+  const preamble = buildWorkspaceImportPreamble(moduleId, meta?.imports, additional, skipSafetyCheckFor);
 
   const text = String(sourceText || "");
   const docblockMatch = text.match(/^[\uFEFF\s]*\/\*[\s\S]*?\*\/\s*/);
@@ -88,6 +97,7 @@ let assetsBaseUrl = null;
 let trackRoot = null;
 const moduleClassCache = new Map(); // moduleType -> Promise<ModuleClass>
 const instancesById = new Map(); // instanceId -> { moduleType, instances: [] }
+let userImportNames: Set<string> = new Set();
 
 let rpcSeq = 0;
 const pending = new Map();
@@ -124,6 +134,8 @@ type NwWrldSdk = {
   readText?: (relPath: unknown) => Promise<unknown>;
   loadJson?: (relPath: unknown) => Promise<unknown>;
   listAssets?: (relDir: unknown) => Promise<string[]>;
+  tween?: (from: unknown, to: unknown, duration: unknown, easing: unknown, onUpdate: unknown) => unknown;
+  resolveEasing?: (name: unknown) => unknown;
 };
 
 const createSdk = () => {
@@ -222,8 +234,8 @@ const getInstanceIndex = (trackModules, instanceId) => {
   return idx >= 0 ? idx : 0;
 };
 
-const loadModuleClassFromSource = async (moduleType, sourceText) => {
-  const injected = injectWorkspaceModuleImports(moduleType, sourceText);
+const loadModuleClassFromSource = async (moduleType, sourceText, skipSafetyCheckFor?: Set<string>) => {
+  const injected = injectWorkspaceModuleImports(moduleType, sourceText, skipSafetyCheckFor);
   const blob = new Blob([injected], { type: "text/javascript" });
   const blobUrl = URL.createObjectURL(blob);
   try {
@@ -335,6 +347,48 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
       destroyTrack();
       assetsBaseUrl = props.assetsBaseUrl || null;
       globalThis.nwWrldSdk = createSdk();
+
+      // Load user-defined imports from nw_wrld.imports.json
+      userImportNames = new Set();
+      const rawUserImports = Array.isArray(props.userImports) ? props.userImports : [];
+      for (const entry of rawUserImports) {
+        if (!entry || typeof entry !== "object") continue;
+        const name = typeof entry.name === "string" ? entry.name.trim() : "";
+        const rawUrl = typeof entry.resolvedUrl === "string" ? entry.resolvedUrl.trim() : "";
+        const source = typeof entry.source === "string" ? entry.source.trim() : "";
+        // For relative paths (./libs/...), resolve through assetsBaseUrl instead of file:// URL
+        let url = rawUrl;
+        if (source.startsWith("./") && assetsBaseUrl) {
+          const relPath = source.slice(2);
+          try {
+            url = new URL(relPath, ensureTrailingSlash(assetsBaseUrl)).href;
+          } catch {}
+        }
+        if (!name || !url) continue;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            console.warn(`[Sandbox] Failed to fetch user import "${name}" from ${url}: ${res.status}`);
+            continue;
+          }
+          const text = await res.text();
+          const blob = new Blob([text], { type: "text/javascript" });
+          const blobUrl = URL.createObjectURL(blob);
+          try {
+            const mod = await import(/* webpackIgnore: true */ blobUrl);
+            globalThis[name] = mod?.default || mod;
+          } catch (e) {
+            // Fallback: execute as plain script assigning to globalThis
+            const fn = new Function(text);
+            fn();
+          } finally {
+            try { URL.revokeObjectURL(blobUrl); } catch {}
+          }
+          userImportNames.add(name);
+        } catch (e) {
+          console.warn(`[Sandbox] Error loading user import "${name}":`, e);
+        }
+      }
 
       const root = ensureRoot();
       const track = props.track || {};
@@ -519,7 +573,22 @@ globalThis.nwSandboxIpc?.on?.(async (data) => {
     if (type === "introspectModule") {
       const moduleType = String(props.moduleType || "").trim();
       const sourceText = String(props.sourceText || "");
-      const ModuleClass = await loadModuleClassFromSource(moduleType, sourceText);
+      // Merge user import names passed from the introspection caller
+      // and skip safety checks for them (libraries aren't loaded during introspection)
+      const introspectionSkip = new Set<string>();
+      if (Array.isArray(props.userImportNames)) {
+        for (const n of props.userImportNames) {
+          if (typeof n === "string" && n.trim()) {
+            userImportNames.add(n.trim());
+            introspectionSkip.add(n.trim());
+          }
+        }
+      }
+      const ModuleClass = await loadModuleClassFromSource(
+        moduleType,
+        sourceText,
+        introspectionSkip.size > 0 ? introspectionSkip : undefined
+      );
       const callable = getCallableMethodNamesFromClass(ModuleClass);
       const baseMethods = getBaseMethodsForClass(ModuleClass);
       const declaredMethods = Array.isArray(ModuleClass?.methods) ? ModuleClass.methods : [];
@@ -563,6 +632,9 @@ if (perfToken) {
     const now = performance.now();
     const dt = now - lastFrameAt;
     lastFrameAt = now;
+
+    // Update TWEEN per frame so module tweens animate
+    try { TWEEN.update(); } catch {}
 
     if (dt > 0 && Number.isFinite(dt)) {
       frames += 1;

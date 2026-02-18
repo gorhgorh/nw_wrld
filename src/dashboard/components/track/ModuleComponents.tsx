@@ -601,56 +601,66 @@ export const NoteSelector = memo(
                       if (config?.sequencerMode) {
                         return `Channel ${channel.number}`;
                       }
-                      const resolvedChannelTrigger = resolveChannelTrigger(
-                        channel.number,
-                        currentInputType,
-                        globalMappings
-                      );
-                      if (
-                        resolvedChannelTrigger === "" ||
-                        resolvedChannelTrigger === null ||
-                        resolvedChannelTrigger === undefined
-                      ) {
+
+                      const noteMatchMode = (() => {
+                        const inputRaw = isPlainObject(globalMappings)
+                          ? (globalMappings as Record<string, unknown>).input
+                          : null;
+                        return isPlainObject(inputRaw) && inputRaw.noteMatchMode === "exactNote"
+                          ? "exactNote"
+                          : "pitchClass";
+                      })();
+
+                      const formatTrigger = (trigger: unknown, sourceType: string) => {
+                        if (trigger === "" || trigger === null || trigger === undefined) return null;
+                        if (sourceType === "midi") {
+                          if (noteMatchMode === "exactNote") {
+                            const label = String(trigger ?? "").trim();
+                            return label || null;
+                          }
+                          const pc = typeof trigger === "number" ? trigger : parsePitchClass(trigger);
+                          return pc !== null ? pitchClassToName(pc) : null;
+                        }
+                        return String(trigger);
+                      };
+
+                      // Resolve triggers for all reconcilable source types
+                      const sourceTypes = ["midi", "osc", "websocket"];
+                      const triggerParts: { label: string; sourceLabel: string; isPrimary: boolean }[] = [];
+                      for (const st of sourceTypes) {
+                        const trigger = resolveChannelTrigger(channel.number, st, globalMappings);
+                        const label = formatTrigger(trigger, st);
+                        if (label) {
+                          const sourceLabel = st === "midi" ? "MIDI" : st === "osc" ? "OSC" : "WS";
+                          triggerParts.push({ label, sourceLabel, isPrimary: st === currentInputType });
+                        }
+                      }
+
+                      if (triggerParts.length === 0) {
                         return `Channel ${channel.number}`;
                       }
-                      if (currentInputType === "midi") {
-                        const noteMatchMode = (() => {
-                          const inputRaw = isPlainObject(globalMappings)
-                            ? (globalMappings as Record<string, unknown>).input
-                            : null;
-                          const mode =
-                            isPlainObject(inputRaw) && inputRaw.noteMatchMode === "exactNote"
-                              ? "exactNote"
-                              : "pitchClass";
-                          return mode;
-                        })();
-                        if (noteMatchMode === "exactNote") {
-                          const label = String(resolvedChannelTrigger ?? "").trim();
-                          return label ? (
-                            <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
-                              {label}
-                            </span>
-                          ) : (
-                            `Channel ${channel.number}`
-                          );
-                        }
 
-                        const pc =
-                          typeof resolvedChannelTrigger === "number"
-                            ? resolvedChannelTrigger
-                            : parsePitchClass(resolvedChannelTrigger);
-                        const name = pc !== null ? pitchClassToName(pc) : null;
-                        return name ? (
+                      // If only one source has a trigger, show it without source label (existing behavior)
+                      if (triggerParts.length === 1) {
+                        return (
                           <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
-                            {name}
+                            {triggerParts[0].label}
                           </span>
-                        ) : (
-                          `Channel ${channel.number}`
                         );
                       }
+
+                      // Multiple sources: show all with source labels
                       return (
-                        <span className={isFlashing ? "text-red-500" : "text-blue-500"}>
-                          {String(resolvedChannelTrigger)}
+                        <span className="inline-flex items-center gap-1 flex-wrap">
+                          {triggerParts.map((tp, i) => (
+                            <span key={tp.sourceLabel}>
+                              <span className={isFlashing && tp.isPrimary ? "text-red-500" : tp.isPrimary ? "text-blue-500" : "text-blue-500/50"}>
+                                {tp.label}
+                              </span>
+                              <span className="text-neutral-600 text-[9px] ml-0.5">{tp.sourceLabel}</span>
+                              {i < triggerParts.length - 1 && <span className="text-neutral-700 mx-0.5">{"\u00B7"}</span>}
+                            </span>
+                          ))}
                         </span>
                       );
                     })()}

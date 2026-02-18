@@ -208,15 +208,71 @@ const LogItem = memo(({ log }: LogItemProps) => {
 
 LogItem.displayName = "LogItem";
 
+type LastInputEvent = {
+  source: string;
+  summary: string;
+  type: string;
+  ts: number;
+};
+
+type InputStatusInfo = {
+  status: string;
+  message?: string;
+  activeSources?: string[];
+};
+
 type DebugOverlayModalProps = {
   isOpen: boolean;
   onClose: () => void;
   debugLogs: string[];
   perfStats?: { fps: number; frameMsAvg: number; longFramePct: number; at: number } | null;
+  lastInputEvents?: Record<string, LastInputEvent>;
+  inputStatus?: InputStatusInfo;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  midi: "MIDI",
+  osc: "OSC",
+  websocket: "WS",
+  audio: "AUDIO",
+  file: "FILE",
+};
+
+const formatRelativeTime = (ts: number): string => {
+  const delta = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (delta < 1) return "now";
+  if (delta < 60) return `${delta}s ago`;
+  const mins = Math.floor(delta / 60);
+  return `${mins}m ago`;
+};
+
+const LiveInputCard = ({ source, event, isActive }: { source: string; event: LastInputEvent | null; isActive: boolean }) => {
+  const label = SOURCE_LABELS[source] || source;
+  const statusColor = isActive ? "text-emerald-400/70" : "text-neutral-500/50";
+  const statusText = isActive ? "connected" : "inactive";
+
+  return (
+    <div className="bg-neutral-900 rounded px-3 py-2 min-w-[140px]">
+      <div className="flex items-center gap-2 mb-1">
+        <span className={`text-[8px] ${statusColor}`}>{"\u25CF"}</span>
+        <span className="text-[11px] text-neutral-300 font-medium">{label}</span>
+        <span className={`text-[9px] ${statusColor}`}>{statusText}</span>
+      </div>
+      {event ? (
+        <div className="text-[10px] text-neutral-500 leading-tight">
+          <div>{event.type === "track-selection" ? "Track Selection" : "Method Trigger"}</div>
+          <div className="text-neutral-400">{event.summary}</div>
+          <div className="text-neutral-600">{formatRelativeTime(event.ts)}</div>
+        </div>
+      ) : (
+        <div className="text-[10px] text-neutral-600">No events</div>
+      )}
+    </div>
+  );
 };
 
 export const DebugOverlayModal = memo(
-  ({ isOpen, onClose, debugLogs, perfStats }: DebugOverlayModalProps) => {
+  ({ isOpen, onClose, debugLogs, perfStats, lastInputEvents, inputStatus }: DebugOverlayModalProps) => {
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const scrollTimeoutRef = useRef<number | null>(null);
 
@@ -276,6 +332,28 @@ export const DebugOverlayModal = memo(
           </Button>
         </div>
       </div>
+      {/* Live Input Cards */}
+      {(() => {
+        const activeSources = inputStatus?.activeSources || [];
+        const allSources = new Set([...activeSources, ...Object.keys(lastInputEvents || {})]);
+        if (allSources.size === 0) return null;
+        const sourceList = ["midi", "osc", "websocket", "audio", "file"].filter((s) => allSources.has(s));
+        return (
+          <div className="px-6 py-3 border-b border-neutral-800">
+            <div className="text-[10px] text-neutral-500 uppercase mb-2">Live Input</div>
+            <div className="flex gap-2 flex-wrap">
+              {sourceList.map((source) => (
+                <LiveInputCard
+                  key={source}
+                  source={source}
+                  event={lastInputEvents?.[source] || null}
+                  isActive={activeSources.includes(source)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       <div
         ref={logContainerRef}
         className="debug-log-viewer flex-1 overflow-y-auto px-6 py-4 text-neutral-300 text-[11px] leading-[1.5] [scrollbar-width:none] [-ms-overflow-style:none] hide-scrollbar"

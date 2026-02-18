@@ -6,6 +6,7 @@ export interface InputStatusData {
   status: InputStatus;
   message: string;
   config: InputConfig | null;
+  activeSources?: string[];
 }
 
 export interface InputStatusPayload {
@@ -13,7 +14,7 @@ export interface InputStatusPayload {
   data: InputStatusData;
 }
 
-export type InputSource = "midi" | "osc" | "audio" | "file";
+export type InputSource = "midi" | "osc" | "audio" | "file" | "websocket";
 
 export interface InputEventBase {
   timestamp: number;
@@ -59,14 +60,29 @@ export interface FileMethodTriggerEvent extends InputEventBase {
   velocity: number;
 }
 
+export interface WebSocketTrackSelectionEvent extends InputEventBase {
+  source: "websocket";
+  identifier: string;
+  address: string;
+}
+
+export interface WebSocketMethodTriggerEvent extends InputEventBase {
+  source: "websocket";
+  channelName: string;
+  velocity: number;
+  address: string;
+}
+
 export type TrackSelectionEventData =
   | MidiTrackSelectionEvent
-  | OscTrackSelectionEvent;
+  | OscTrackSelectionEvent
+  | WebSocketTrackSelectionEvent;
 export type MethodTriggerEventData =
   | MidiMethodTriggerEvent
   | OscMethodTriggerEvent
   | AudioMethodTriggerEvent
-  | FileMethodTriggerEvent;
+  | FileMethodTriggerEvent
+  | WebSocketMethodTriggerEvent;
 
 export type InputEventPayload =
   | { type: "track-selection"; data: TrackSelectionEventData }

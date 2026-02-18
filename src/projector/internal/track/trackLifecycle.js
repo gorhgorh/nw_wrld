@@ -1,7 +1,7 @@
 import { find, forEach, isEqual, isFunction } from "lodash";
 import logger from "../../helpers/logger";
 import { TrackSandboxHost } from "../sandbox/TrackSandboxHost";
-import { getMessaging } from "../bridge";
+import { getBridge, getMessaging } from "../bridge";
 
 export function deactivateActiveTrack() {
   if (!this.activeTrack || this.isDeactivating) return;
@@ -171,11 +171,27 @@ export async function handleTrackSelection(trackName) {
       throw new Error("ASSETS_BASE_URL_UNAVAILABLE");
     }
 
+    // Load user-defined imports from workspace
+    let userImports = [];
+    try {
+      const bridge = getBridge();
+      const workspace = bridge?.workspace;
+      if (workspace && typeof workspace.readUserImports === "function") {
+        const importResult = await workspace.readUserImports();
+        if (importResult && importResult.ok && Array.isArray(importResult.imports)) {
+          userImports = importResult.imports;
+        }
+      }
+    } catch (e) {
+      if (debugEnabled) logger.warn("⚠️ [TRACK] Failed to load user imports:", e);
+    }
+
     if (debugEnabled) logger.log("⏳ [TRACK] Waiting for sandbox track init...");
     const res = await this.trackSandboxHost.initTrack({
       track: filteredTrack,
       moduleSources,
       assetsBaseUrl,
+      userImports,
     });
     if (!res || res.ok !== true) {
       const resObj = res && typeof res === "object" ? res : {};

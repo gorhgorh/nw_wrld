@@ -43,10 +43,52 @@ function normalizeModules(value: Jsonish): { modules: Jsonish[]; changed: boolea
     const hasDisabledKey = Object.prototype.hasOwnProperty.call(m, "disabled");
     const disabledIsTrue = (m as Record<string, Jsonish>).disabled === true;
 
+    // Validate inputSource: must be midi/osc/websocket or strip
+    const hasInputSource = Object.prototype.hasOwnProperty.call(m, "inputSource");
+    const VALID_INPUT_SOURCES = new Set(["midi", "osc", "websocket"]);
+    const rawInputSource = (m as Record<string, Jsonish>).inputSource;
+    const inputSourceValid =
+      hasInputSource && typeof rawInputSource === "string" && VALID_INPUT_SOURCES.has(rawInputSource);
+    const needsInputSourceStrip = hasInputSource && !inputSourceValid;
+
+    // Validate inputMappings: plain obj, keys 1-12, values string|number
+    const hasInputMappings = Object.prototype.hasOwnProperty.call(m, "inputMappings");
+    let normalizedMappings: Record<string, Jsonish> | null = null;
+    let needsMappingsFix = false;
+    if (hasInputMappings) {
+      const rawMappings = (m as Record<string, Jsonish>).inputMappings;
+      if (isPlainObject(rawMappings)) {
+        const cleaned: Record<string, Jsonish> = {};
+        let anyKept = false;
+        let anyDropped = false;
+        for (const k of Object.keys(rawMappings)) {
+          const n = parseInt(k, 10);
+          if (!Number.isFinite(n) || n < 1 || n > 12 || String(n) !== k) {
+            anyDropped = true;
+            continue;
+          }
+          const v = rawMappings[k];
+          if (typeof v === "string" || typeof v === "number") {
+            cleaned[k] = v;
+            anyKept = true;
+          } else {
+            anyDropped = true;
+          }
+        }
+        if (anyDropped || !anyKept) {
+          needsMappingsFix = true;
+          normalizedMappings = anyKept ? cleaned : null;
+        }
+      } else {
+        needsMappingsFix = true;
+        normalizedMappings = null;
+      }
+    }
+
     const needsIdType = m.id !== id || m.type !== type;
     const needsDisabled = hasDisabledKey && !disabledIsTrue;
 
-    if (!needsIdType && !needsDisabled) {
+    if (!needsIdType && !needsDisabled && !needsInputSourceStrip && !needsMappingsFix) {
       out.push(m);
       continue;
     }
@@ -54,6 +96,11 @@ function normalizeModules(value: Jsonish): { modules: Jsonish[]; changed: boolea
     changed = true;
     const next: Record<string, Jsonish> = { ...m, id, type };
     if (!disabledIsTrue) delete next.disabled;
+    if (needsInputSourceStrip) delete next.inputSource;
+    if (needsMappingsFix) {
+      if (normalizedMappings) next.inputMappings = normalizedMappings;
+      else delete next.inputMappings;
+    }
     out.push(next);
   }
   return { modules: out, changed };
@@ -295,6 +342,15 @@ export function sanitizeUserDataForBridge(value: Jsonish, defaultValue: Jsonish)
       ensure();
       cfg.trackMappings = { ...tm2, file: {} };
     }
+    if (!isPlainObject((cfg.trackMappings as Record<string, Jsonish>).websocket)) {
+      const tm2 = cfg.trackMappings as Record<string, Jsonish>;
+      const fallbackWs = isPlainObject(fallbackTrackMappings.websocket)
+        ? (fallbackTrackMappings.websocket as Record<string, Jsonish>)
+        : {};
+      ensureConfig();
+      ensure();
+      cfg.trackMappings = { ...tm2, websocket: fallbackWs };
+    }
   }
 
   const fallbackChannelMappings = isPlainObject(fallbackCfg.channelMappings)
@@ -322,6 +378,15 @@ export function sanitizeUserDataForBridge(value: Jsonish, defaultValue: Jsonish)
       ensureConfig();
       ensure();
       cfg.channelMappings = { ...cm2, file: fallbackFile };
+    }
+    if (!isPlainObject((cfg.channelMappings as Record<string, Jsonish>).websocket)) {
+      const cm2 = cfg.channelMappings as Record<string, Jsonish>;
+      const fallbackWs = isPlainObject(fallbackChannelMappings.websocket)
+        ? (fallbackChannelMappings.websocket as Record<string, Jsonish>)
+        : {};
+      ensureConfig();
+      ensure();
+      cfg.channelMappings = { ...cm2, websocket: fallbackWs };
     }
   }
 

@@ -11,6 +11,9 @@ type IntrospectionContext = {
   trackSandboxHost: TrackSandboxHost | null;
 };
 
+type UserImportEntry = { name?: string; resolvedUrl?: string };
+type ReadUserImportsResult = { ok?: boolean; imports?: UserImportEntry[] } | null;
+
 export async function introspectModule(
   this: IntrospectionContext,
   moduleId: unknown
@@ -60,9 +63,29 @@ export async function introspectModule(
       if (!this.trackSandboxHost) {
         this.trackSandboxHost = new TrackSandboxHost(null);
       }
+
+      // Read user import names so the sandbox can validate them during introspection
+      let userImportNames: string[] = [];
+      try {
+        const bridge =
+          (globalThis as typeof globalThis & { nwWrldBridge?: unknown })
+            .nwWrldBridge as
+            | { workspace?: { readUserImports?: () => Promise<unknown> | unknown } }
+            | undefined;
+        if (bridge?.workspace && typeof bridge.workspace.readUserImports === "function") {
+          const importResult = (await bridge.workspace.readUserImports()) as ReadUserImportsResult;
+          if (importResult?.ok && Array.isArray(importResult.imports)) {
+            userImportNames = importResult.imports
+              .map((e) => (e && typeof e.name === "string" ? e.name : ""))
+              .filter((n) => n.length > 0);
+          }
+        }
+      } catch {}
+
       const initRes = await this.trackSandboxHost.introspectModule(
         src.moduleId,
-        src.text
+        src.text,
+        userImportNames
       );
       if (
         !initRes ||

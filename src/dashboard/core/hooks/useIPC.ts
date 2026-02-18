@@ -47,6 +47,11 @@ export const useIPCInvoke = () => {
         ? await (messaging as unknown as { emitFileBand: (payload: unknown) => Promise<unknown> }).emitFileBand(args[0])
         : null;
     }
+    if (channel === "input:reconcileSources") {
+      return typeof (messaging as unknown as { reconcileSources?: unknown }).reconcileSources === "function"
+        ? await (messaging as unknown as { reconcileSources: (payload: unknown) => Promise<unknown> }).reconcileSources(args[0])
+        : null;
+    }
     if (channel === "workspace:select") {
       return typeof messaging.selectWorkspace === "function"
         ? await messaging.selectWorkspace()

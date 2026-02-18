@@ -2,7 +2,7 @@
 
 nw_wrld is an event-driven sequencer for triggering visuals using web technologies. It enables users to scale up audiovisual compositions for prototyping, demos, exhibitions, and live performances. Users code their own visual modules, then orchestrate them using the project's native UI composer.
 
-Visuals can be triggered via the built-in 16-step sequencer or by configuring external MIDI/OSC inputs.
+Visuals can be triggered via the built-in 16-step sequencer or by configuring external MIDI, OSC, audio capture, or file-upload inputs.
 
 ![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 ![Electron](https://img.shields.io/badge/electron-v39.2.7-blue)
@@ -11,7 +11,7 @@ Visuals can be triggered via the built-in 16-step sequencer or by configuring ex
 
 ## Beta Notice
 
-This project is currently in beta. Downloadable installers are not currently provided; run `nw_wrld` from source using this repository. Please note that whilst the project is in beta, there will likely be frequent breaking changes between releases.
+This project is currently in beta. Downloadable installers are provided via GitHub Releases for macOS, Windows, and Linux, and `nw_wrld` can also be run from source using this repository. Please note that whilst the project is in beta, there may be frequent breaking changes between releases.
 
 ## Roadmap
 
@@ -20,11 +20,11 @@ This project is currently in beta. Downloadable installers are not currently pro
 - [x] TypeScript migration
 - [x] Unit tests, E2E Playwright tests, runtime validations
 - [ ] Use-case specific User Guides (Ableton, strudel, TouchDesigner, etc.)
-- [ ] Signed and notarized MacOS app builds
-- [ ] Signed Windows app builds
-- [ ] Robust Linux & WSL support
+- [x] Signed and notarized macOS app builds
+- [x] Signed Windows app builds
+- [x] Robust Linux & WSL support
 - [ ] Userdata, Module, and JSON versioning (+ migration scripts)
-- [ ] Multi-band audio threshold analysis (local processing) for channel triggers
+- [x] Multi-band audio threshold analysis (local processing) for channel triggers
 - [ ] Advanced default sequencer (Working sampler with audio FX)
 - [ ] Remote API input source with HTTP/WebSocket client for cloud-based services (audio analysis APIs, ML models, etc.)
 - [ ] Serial port input support for hardware sensor integration
@@ -32,11 +32,13 @@ This project is currently in beta. Downloadable installers are not currently pro
 ## Features
 
 - **Built-in 16-step pattern sequencer** - Create rhythmic audiovisual compositions without external hardware
-- **External MIDI/OSC support** - Connect Ableton Live, TouchOSC, or any MIDI/OSC source for live performance
+- **External MIDI/OSC/audio/file support** - Use MIDI, OSC, microphone/loopback audio capture, or uploaded audio files as trigger sources
 - **Visual module system** - Build custom visuals with p5.js, Three.js, D3.js, or vanilla JavaScript
 - **Hot module reloading** - Edit modules and see changes instantly
 - **Project folder workflow** - Self-contained, portable projects with modules, assets, and data
 - **Flexible method mapping** - Trigger any visual method with sequencer patterns or external signals
+- **Per-track signal settings** - Configure per-track thresholds and trigger cooldown for audio and file modes
+- **Module enable/disable toggle** - Disable modules per track without removing configuration
 
 ---
 
@@ -147,7 +149,8 @@ Signal Sources:
                   ├──▶ Dashboard ──▶ Projector
 ┌──────────────┐  │    (Control)     (Visuals)
 │ External     │──┘
-│ MIDI/OSC     │
+│ MIDI/OSC/    │
+│ Audio/File   │
 └──────────────┘
 ```
 
@@ -163,11 +166,11 @@ The built-in sequencer is perfect for testing modules and creating standalone au
 
 ---
 
-## Advanced: External MIDI/OSC Control
+## Advanced: External Input Control
 
-For live performance with external hardware, you can connect MIDI controllers or DAWs.
+For live performance and reactive workflows, you can use MIDI controllers/DAWs, OSC senders, audio input devices, or uploaded audio files.
 
-To set up MIDI routing and switch to external mode, see [Getting Started](GETTING_STARTED.md#advanced-connect-external-midiosc).
+To set up input routing and switch modes, see [Getting Started](GETTING_STARTED.md#advanced-connect-external-midiosc).
 
 ### DAW Quickstart (Ableton / FL Studio / Logic / etc.)
 
@@ -243,7 +246,7 @@ See the [Module Development Guide](MODULE_DEVELOPMENT.md) for complete documenta
 
 When you extend `ModuleBase`, you inherit powerful methods for free: `show`, `hide`, `offset`, `scale`, `opacity`, `rotate`, `randomZoom`, and `matrix`.
 
-These methods can be triggered via the sequencer or external MIDI/OSC, giving you instant control over positioning, visibility, transformations, and effects.
+These methods can be triggered via the sequencer or external signal sources (MIDI/OSC/audio/file), giving you instant control over positioning, visibility, transformations, and effects.
 
 See the [Module Development Guide](MODULE_DEVELOPMENT.md#option-types-reference) for complete documentation of all built-in methods and their parameters.
 
@@ -255,11 +258,13 @@ Switch between modes in **Settings → Signal Source**.
 
 **Sequencer Mode (Default)** - Program patterns with a 16-step grid per channel. Perfect for getting started, testing modules, and creating standalone pieces without external hardware. Adjustable BPM (60-130), patterns loop continuously and save with your tracks.
 
-**External Mode (Advanced)** - Connect MIDI/OSC hardware for live performance.
+**External Modes (Advanced)** - Use one of the following sources:
 
 - **MIDI (Pitch Class)**: map C..B (octave-agnostic). This avoids “G7 vs G8” naming differences across DAWs because matching is based on pitch class.
 - **MIDI (Exact Note)**: map full MIDI note numbers (0–127) for octave-specific triggers.
 - **OSC**: map OSC addresses.
+- **External Audio**: capture live audio from a selected input device and trigger channels from Low/Medium/High bands.
+- **File Upload**: upload an MP3/WAV per track and trigger channels from Low/Medium/High bands during playback.
 
 Configure global mappings in Settings for consistent control across all tracks.
 

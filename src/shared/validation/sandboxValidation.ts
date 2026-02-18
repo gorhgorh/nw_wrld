@@ -133,9 +133,17 @@ export function normalizeSandboxRequestProps(
     };
 
     if (t === "initTrack") {
+      const userImports = Array.isArray(p.userImports)
+        ? (p.userImports as Jsonish[]).filter(
+            (entry): entry is Record<string, Jsonish> =>
+              isPlainObject(entry as Jsonish) &&
+              typeof (entry as Record<string, Jsonish>).name === "string" &&
+              typeof (entry as Record<string, Jsonish>).resolvedUrl === "string"
+          )
+        : [];
       return {
         ok: true,
-        props: { track: safeTrack, moduleSources, assetsBaseUrl },
+        props: { track: safeTrack, moduleSources, assetsBaseUrl, userImports },
       };
     }
 

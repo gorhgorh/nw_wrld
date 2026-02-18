@@ -70,6 +70,8 @@ const nwWrldBridge = {
       ipcRenderer.invoke("bridge:workspace:readAssetArrayBuffer", relPath),
     writeAudioAsset: (payload: unknown) =>
       ipcRenderer.invoke("bridge:workspace:writeAudioAsset", payload),
+    readUserImports: () =>
+      ipcRenderer.invoke("bridge:workspace:readUserImports"),
   },
   app: {
     getBaseMethodNames: () => ipcRenderer.sendSync("bridge:app:getBaseMethodNames") as unknown,
@@ -127,6 +129,7 @@ const nwWrldBridge = {
     getMidiDevices: () => ipcRenderer.invoke("input:get-midi-devices"),
     emitAudioBand: (payload: unknown) => ipcRenderer.invoke("input:audio:emitBand", payload),
     emitFileBand: (payload: unknown) => ipcRenderer.invoke("input:file:emitBand", payload),
+    reconcileSources: (sources: unknown) => ipcRenderer.invoke("input:reconcileSources", sources),
     selectWorkspace: () => ipcRenderer.invoke("workspace:select"),
   },
 };

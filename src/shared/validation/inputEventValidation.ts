@@ -37,7 +37,7 @@ export function normalizeInputEventPayload(
   const dataObj = data as DataBag;
 
   const source = dataObj.source;
-  if (source !== "midi" && source !== "osc" && source !== "audio" && source !== "file") return null;
+  if (source !== "midi" && source !== "osc" && source !== "audio" && source !== "file" && source !== "websocket") return null;
 
   const timestamp = isFiniteNumber(dataObj.timestamp)
     ? dataObj.timestamp
@@ -93,6 +93,42 @@ export function normalizeInputEventPayload(
         ...dataObj,
         source: "file",
         timestamp,
+        channelName,
+        velocity,
+      },
+    };
+  }
+
+  if (source === "websocket") {
+    if (!isNonEmptyString(dataObj.address)) return null;
+    const address = dataObj.address;
+
+    if (type === "track-selection") {
+      if (!isNonEmptyString(dataObj.identifier)) return null;
+      const identifier = dataObj.identifier;
+      return {
+        type,
+        data: {
+          ...dataObj,
+          source: "websocket",
+          timestamp,
+          address,
+          identifier,
+        },
+      };
+    }
+
+    if (!isNonEmptyString(dataObj.channelName)) return null;
+    if (!isFiniteNumber(dataObj.velocity)) return null;
+    const channelName = dataObj.channelName;
+    const velocity = dataObj.velocity;
+    return {
+      type,
+      data: {
+        ...dataObj,
+        source: "websocket",
+        timestamp,
+        address,
         channelName,
         velocity,
       },

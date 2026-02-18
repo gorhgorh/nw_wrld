@@ -526,7 +526,9 @@ export const SettingsModal = ({
         ? "audio"
         : inputConfig?.type === "file"
           ? "file"
-          : "midi";
+          : inputConfig?.type === "websocket"
+            ? "websocket"
+            : "midi";
   const signalSourceValue = config.sequencerMode
     ? "sequencer"
     : normalizedInputType === "osc"
@@ -535,7 +537,9 @@ export const SettingsModal = ({
         ? "external-audio"
         : normalizedInputType === "file"
           ? "file-upload"
-          : "external-midi";
+          : normalizedInputType === "websocket"
+            ? "external-websocket"
+            : "external-midi";
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -603,6 +607,24 @@ export const SettingsModal = ({
                       className="cursor-pointer text-[11px] font-mono text-neutral-300"
                     >
                       External OSC
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3 py-1">
+                    <RadioButton
+                      id="signal-external-websocket"
+                      name="signalSource"
+                      value="external-websocket"
+                      checked={signalSourceValue === "external-websocket"}
+                      onChange={() => {
+                        updateConfig({ sequencerMode: false });
+                        setInputConfig({ ...inputConfig, type: "websocket" });
+                      }}
+                    />
+                    <label
+                      htmlFor="signal-external-websocket"
+                      className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                    >
+                      External WebSocket
                     </label>
                   </div>
                   <div className="flex items-center gap-3 py-1">
@@ -806,6 +828,39 @@ export const SettingsModal = ({
                         <div className="pl-6">
                           <div className="text-[10px] opacity-50">
                             Send OSC to: localhost:{inputConfig.port}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {normalizedInputType === "websocket" && (
+                      <>
+                        <div className="pl-6">
+                          <div className="mb-1 text-[11px] relative inline-block">
+                            <span className="opacity-50">WebSocket Port:</span>
+                          </div>
+                          <NumberInput
+                            id="wsPort"
+                            value={inputConfig.port || 8080}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                              setInputConfig({
+                                ...inputConfig,
+                                port: parseInt(e.target.value) || 8080,
+                              })
+                            }
+                            className="py-1 w-full"
+                            min={1024}
+                            max={65535}
+                          />
+                        </div>
+
+                        <div className="pl-6">
+                          <div className="text-[10px] opacity-50">
+                            Connect to: ws://localhost:{inputConfig.port || 8080}
+                          </div>
+                          <div className="text-[10px] opacity-50 mt-1">
+                            JSON messages: {`{"type":"track","address":"/track/name"}`} or{" "}
+                            {`{"type":"channel","address":"/ch/name","velocity":127}`}
                           </div>
                         </div>
                       </>

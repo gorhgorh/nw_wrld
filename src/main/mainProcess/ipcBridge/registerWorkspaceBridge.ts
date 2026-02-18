@@ -11,6 +11,7 @@ import {
   normalizeModuleUrlResult,
   normalizeModuleWithMeta,
 } from "../../../shared/validation/workspaceValidation";
+import { validateUserImportsManifest } from "../../../shared/validation/userImportsValidation";
 import {
   isExistingDirectory,
   resolveWithinDir,
@@ -356,6 +357,48 @@ export function registerWorkspaceBridge(): void {
       return { ok: true, relPath };
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : "WRITE_FAILED" };
+    }
+  });
+
+  ipcMain.handle("bridge:workspace:readUserImports", async (event) => {
+    const projectDir = getProjectDirForEvent(event as unknown as SenderEvent);
+    if (!projectDir || !isExistingDirectory(projectDir)) {
+      return { ok: true, imports: [] };
+    }
+    const manifestPath = path.join(projectDir, "nw_wrld.imports.json");
+    try {
+      const text = await fs.promises.readFile(manifestPath, "utf-8");
+      const parsed = JSON.parse(text);
+      const result = validateUserImportsManifest(parsed);
+      if (!result.ok) {
+        return { ok: false, error: (result as { error: string }).error };
+      }
+      const assetsDir = path.join(projectDir, "assets");
+      const resolved = result.imports.map((entry) => {
+        if (entry.source.startsWith("./")) {
+          const relPath = entry.source.slice(2);
+          const fullPath = resolveWithinDir(assetsDir, relPath);
+          if (!fullPath) {
+            return { name: entry.name, source: entry.source, resolvedUrl: null };
+          }
+          try {
+            return {
+              name: entry.name,
+              source: entry.source,
+              resolvedUrl: pathToFileURL(fullPath).href,
+            };
+          } catch {
+            return { name: entry.name, source: entry.source, resolvedUrl: null };
+          }
+        }
+        return { name: entry.name, source: entry.source, resolvedUrl: entry.source };
+      });
+      return { ok: true, imports: resolved };
+    } catch (e) {
+      if (e && typeof e === "object" && (e as { code?: string }).code === "ENOENT") {
+        return { ok: true, imports: [] };
+      }
+      return { ok: false, error: "Failed to read nw_wrld.imports.json" };
     }
   });
 }

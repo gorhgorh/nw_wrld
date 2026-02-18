@@ -8,7 +8,7 @@ import { updateUserData } from "../core/utils";
 import { DEFAULT_GLOBAL_MAPPINGS } from "../../shared/config/defaultConfig";
 import { parsePitchClass, pitchClassToName } from "../../shared/midi/midiUtils";
 
-type ActiveTab = "midi-pitchClass" | "midi-exactNote" | "osc" | "audio" | "file";
+type ActiveTab = "midi-pitchClass" | "midi-exactNote" | "osc" | "websocket" | "audio" | "file";
 
 type InputMappingsModalProps = {
   isOpen: boolean;
@@ -43,13 +43,15 @@ export const InputMappingsModal = ({
     const nextTab: ActiveTab =
       inputType === "osc"
         ? "osc"
-        : inputType === "audio"
-          ? "audio"
-          : inputType === "file"
-            ? "file"
-            : noteMatchMode === "exactNote"
-              ? "midi-exactNote"
-              : "midi-pitchClass";
+        : inputType === "websocket"
+          ? "websocket"
+          : inputType === "audio"
+            ? "audio"
+            : inputType === "file"
+              ? "file"
+              : noteMatchMode === "exactNote"
+                ? "midi-exactNote"
+                : "midi-pitchClass";
     setActiveTab(nextTab);
   }, [isOpen, userData]);
 
@@ -57,6 +59,7 @@ export const InputMappingsModal = ({
   const trackMappings = (cfg?.trackMappings as Record<string, unknown>) || {};
   const channelMappings = (cfg?.channelMappings as Record<string, unknown>) || {};
   const isMidi = activeTab.startsWith("midi-");
+  const isAddressBased = activeTab === "osc" || activeTab === "websocket";
   const isAudioOrFile = activeTab === "audio" || activeTab === "file";
   const midiMode = activeTab === "midi-exactNote" ? "exactNote" : "pitchClass";
   const trackSlots = isMidi ? 12 : 10;
@@ -186,6 +189,9 @@ export const InputMappingsModal = ({
         if (activeTab === "osc") {
           if (!tm.osc) tm.osc = {};
           (tm.osc as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "websocket") {
+          if (!tm.websocket) tm.websocket = {};
+          (tm.websocket as Record<string, unknown>)[String(slot)] = value;
         } else if (activeTab === "audio") {
           if (!tm.audio) tm.audio = {};
           (tm.audio as Record<string, unknown>)[String(slot)] = value;
@@ -229,6 +235,9 @@ export const InputMappingsModal = ({
         if (activeTab === "osc") {
           if (!cm.osc) cm.osc = {};
           (cm.osc as Record<string, unknown>)[String(slot)] = value;
+        } else if (activeTab === "websocket") {
+          if (!cm.websocket) cm.websocket = {};
+          (cm.websocket as Record<string, unknown>)[String(slot)] = value;
         } else if (activeTab === "audio") {
           if (!cm.audio) cm.audio = {};
           (cm.audio as Record<string, unknown>)[String(slot)] = value;
@@ -310,6 +319,21 @@ export const InputMappingsModal = ({
                   className="cursor-pointer text-[11px] font-mono text-neutral-300"
                 >
                   OSC
+                </label>
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <RadioButton
+                  id="input-mappings-websocket"
+                  name="input-mappings-tab"
+                  value="websocket"
+                  checked={activeTab === "websocket"}
+                  onChange={() => setActiveTab("websocket")}
+                />
+                <label
+                  htmlFor="input-mappings-websocket"
+                  className="cursor-pointer text-[11px] font-mono text-neutral-300"
+                >
+                  WebSocket
                 </label>
               </div>
               <div className="flex items-center gap-3 py-1">
@@ -455,7 +479,7 @@ export const InputMappingsModal = ({
                         <TextInput
                           value={String(
                             (
-                              (channelMappings as Record<string, unknown>).osc as
+                              (channelMappings as Record<string, unknown>)[activeTab] as
                                 | Record<string, unknown>
                                 | undefined
                             )?.[String(slot)] ?? ""
@@ -560,7 +584,7 @@ export const InputMappingsModal = ({
                           <TextInput
                             value={String(
                               (
-                                (trackMappings as Record<string, unknown>).osc as
+                                (trackMappings as Record<string, unknown>)[activeTab] as
                                   | Record<string, unknown>
                                   | undefined
                               )?.[String(slot)] ?? ""

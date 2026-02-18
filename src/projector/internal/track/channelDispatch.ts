@@ -1,7 +1,12 @@
 import { get } from "lodash";
 import logger from "../../helpers/logger";
 
-type ChannelTarget = { instanceId: string; moduleType: string };
+type ChannelTarget = {
+  instanceId: string;
+  moduleType: string;
+  inputSource?: string;
+  inputMappings?: Record<string, string | number>;
+};
 
 type ActiveTrackLike = {
   name?: string;
@@ -82,9 +87,30 @@ export async function handleChannelMessage(
     const matrixOverridesForChannel = new Map<string, unknown>();
     const nonMatrixByInstance = new Map<string, { moduleType: string; methods: unknown }>();
 
-    for (const { instanceId, moduleType } of channelTargets) {
+    const eventSource = typeof debugContext.source === "string" ? debugContext.source : null;
+
+    for (const { instanceId, moduleType, inputSource, inputMappings } of channelTargets) {
       if (this.debugOverlayActive && logger.debugEnabled) {
         this.logToMain(`instanceId: ${instanceId}, moduleType: ${moduleType}`);
+      }
+
+      // Per-module source filtering: skip if event source doesn't match module's input source
+      if (inputSource && eventSource && eventSource !== inputSource) {
+        if (logger.debugEnabled) {
+          logger.log(`Skipping module ${instanceId}: source ${eventSource} !== ${inputSource}`);
+        }
+        continue;
+      }
+
+      // Per-module custom mapping check: if module has inputMappings, only respond to mapped triggers
+      if (inputMappings) {
+        const mappingValue = inputMappings[channelNumber];
+        if (mappingValue === undefined) {
+          if (logger.debugEnabled) {
+            logger.log(`Skipping module ${instanceId}: no inputMapping for channel ${channelNumber}`);
+          }
+          continue;
+        }
       }
 
       const moduleData = get(modulesData as never, instanceId as never) as unknown;
@@ -183,9 +209,21 @@ export function buildChannelHandlerMap(
   }
   const map: Record<string, ChannelTarget[]> = {};
   (t.modules as unknown[]).forEach((m) => {
-    const mm = m as { id?: unknown; type?: unknown } | null;
+    const mm = m as { id?: unknown; type?: unknown; disabled?: unknown; inputSource?: unknown; inputMappings?: unknown } | null;
+    if (mm?.disabled === true) return;
     const instanceId = String(mm?.id || "");
     const type = String(mm?.type || "");
+    const rawInputSource = typeof mm?.inputSource === "string" ? mm.inputSource : undefined;
+    const rawInputMappings = mm?.inputMappings && typeof mm.inputMappings === "object" && !Array.isArray(mm.inputMappings)
+      ? (mm.inputMappings as Record<string, unknown>)
+      : undefined;
+    const inputMappings = rawInputMappings
+      ? Object.fromEntries(
+          Object.entries(rawInputMappings).filter(
+            ([, v]) => typeof v === "string" || typeof v === "number"
+          )
+        ) as Record<string, string | number>
+      : undefined;
     const methodEntries = get(t as never, ["modulesData", instanceId, "methods"] as never) as unknown;
     if (!methodEntries || typeof methodEntries !== "object") return;
     Object.entries(methodEntries as Record<string, unknown>).forEach(
@@ -197,6 +235,8 @@ export function buildChannelHandlerMap(
         map[channelNumber].push({
           instanceId,
           moduleType: type,
+          inputSource: rawInputSource,
+          inputMappings,
         });
       }
     );

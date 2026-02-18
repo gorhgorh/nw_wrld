@@ -43,11 +43,10 @@ export function initInputListener(this: InputListenerContext) {
       typeof (config as { input?: unknown }).input === "object"
         ? String(((config as { input?: unknown }).input as { type?: unknown }).type || "midi")
         : "midi";
-    const midiConfig = buildMidiConfig(this.userData, config, selectedInputType);
+    const eventSource = typeof data.source === "string" ? data.source : selectedInputType;
+    const effectiveInputType = eventSource !== selectedInputType ? eventSource : selectedInputType;
+    const midiConfig = buildMidiConfig(this.userData, config, effectiveInputType);
     if (isSequencerMode) {
-      return;
-    }
-    if (data.source && data.source !== selectedInputType) {
       return;
     }
 
@@ -92,13 +91,13 @@ export function initInputListener(this: InputListenerContext) {
               logger.warn(`⚠️ [INPUT] Note ${data.note} not mapped to any track`);
             }
           }
-        } else if (data.source === "osc") {
+        } else if (data.source === "osc" || data.source === "websocket") {
           const trackNameFromIdentifier = (midiConfig.trackTriggersMap as Record<string, unknown>)[
             String((data as { identifier?: unknown }).identifier)
           ];
           if (debugEnabled) {
             logger.log(
-              `🎯 [INPUT] OSC address ${data.identifier} maps to track:`,
+              `🎯 [INPUT] ${data.source} address ${data.identifier} maps to track:`,
               trackNameFromIdentifier
             );
           }
@@ -112,10 +111,10 @@ export function initInputListener(this: InputListenerContext) {
           } else {
             if (debugEnabled) {
               logger.warn(
-                `⚠️ [INPUT] OSC address ${data.identifier} not mapped to any track`
+                `⚠️ [INPUT] ${data.source} address ${data.identifier} not mapped to any track`
               );
               logger.log(
-                "📋 [INPUT] Available OSC mappings:",
+                "📋 [INPUT] Available mappings:",
                 Object.keys(midiConfig.trackTriggersMap as Record<string, unknown>)
               );
             }
@@ -155,14 +154,14 @@ export function initInputListener(this: InputListenerContext) {
                 logger.log(`🎯 [INPUT] Note ${data.note} maps to channels:`, channelNames);
               }
             }
-          } else if (data.source === "osc") {
+          } else if (data.source === "osc" || data.source === "websocket") {
             const mappedChannels = trackMappings[String((data as { channelName?: unknown }).channelName)];
             if (mappedChannels) {
               channelNames = Array.isArray(mappedChannels)
                 ? mappedChannels
                 : [mappedChannels];
               if (debugEnabled) {
-                logger.log(`🎯 [INPUT] OSC address maps to channels:`, channelNames);
+                logger.log(`🎯 [INPUT] ${data.source} address maps to channels:`, channelNames);
               }
             }
           } else if (data.source === "audio") {
@@ -230,7 +229,9 @@ export function initInputListener(this: InputListenerContext) {
             ? "AUDIO"
             : data.source === "file"
               ? "FILE"
-              : "OSC";
+              : data.source === "websocket"
+                ? "WS"
+                : "OSC";
       let log = `[${timeStr}] ${source} Event\n`;
       if (data.source === "midi") {
         const key = noteNumberToTriggerKey(
@@ -247,7 +248,7 @@ export function initInputListener(this: InputListenerContext) {
             : ""
         }\n`;
         log += `  Channel: ${(data as { channel?: unknown }).channel}\n`;
-      } else if (data.source === "osc") {
+      } else if (data.source === "osc" || data.source === "websocket") {
         log += `  Address: ${(data as { address?: unknown }).address}\n`;
       } else if (data.source === "audio") {
         log += `  Channel: ${(data as { channelName?: unknown }).channelName}\n`;

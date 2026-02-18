@@ -49,15 +49,18 @@ export class TrackSandboxHost {
     track,
     moduleSources,
     assetsBaseUrl,
+    userImports,
   }: {
     track: unknown;
     moduleSources: unknown;
     assetsBaseUrl: unknown;
+    userImports?: unknown;
   }) {
     return this.request("initTrack", {
       track,
       moduleSources,
       assetsBaseUrl,
+      userImports,
     });
   }
 
@@ -91,8 +94,8 @@ export class TrackSandboxHost {
     });
   }
 
-  introspectModule(moduleType: unknown, sourceText: unknown) {
-    return this.request("introspectModule", { moduleType, sourceText });
+  introspectModule(moduleType: unknown, sourceText: unknown, userImportNames?: string[]) {
+    return this.request("introspectModule", { moduleType, sourceText, userImportNames });
   }
 
   destroyTrack() {

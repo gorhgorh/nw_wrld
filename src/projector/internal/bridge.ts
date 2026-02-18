@@ -22,6 +22,7 @@ export type NwWrldSandboxBridge = {
 export type NwWrldWorkspaceBridge = {
   readModuleWithMeta?: (moduleType: string) => Promise<unknown> | unknown;
   getModuleUrl?: (moduleType: string) => Promise<unknown> | unknown;
+  readUserImports?: () => Promise<unknown> | unknown;
 };
 
 export type NwWrldBridge = {

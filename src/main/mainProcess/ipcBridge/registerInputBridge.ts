@@ -43,10 +43,6 @@ export function registerInputBridge(): void {
     if (velocity == null) return { ok: false };
     if (!state.inputManager) return { ok: false };
     const im = state.inputManager as InputManager;
-    const cfg = (im as unknown as { config?: unknown }).config;
-    const cfgObj = cfg && typeof cfg === "object" ? (cfg as Record<string, unknown>) : null;
-    const currentType = cfgObj && typeof cfgObj.type === "string" ? cfgObj.type : "";
-    if (currentType !== "audio") return { ok: false };
     im.broadcast("method-trigger", { source: "audio", channelName, velocity });
     return { ok: true };
   });
@@ -59,11 +55,15 @@ export function registerInputBridge(): void {
     if (velocity == null) return { ok: false };
     if (!state.inputManager) return { ok: false };
     const im = state.inputManager as InputManager;
-    const cfg = (im as unknown as { config?: unknown }).config;
-    const cfgObj = cfg && typeof cfg === "object" ? (cfg as Record<string, unknown>) : null;
-    const currentType = cfgObj && typeof cfgObj.type === "string" ? cfgObj.type : "";
-    if (currentType !== "file") return { ok: false };
     im.broadcast("method-trigger", { source: "file", channelName, velocity });
+    return { ok: true };
+  });
+
+  ipcMain.handle("input:reconcileSources", async (_event, payload: unknown) => {
+    if (!state.inputManager) return { ok: false };
+    const im = state.inputManager as InputManager;
+    const sources = Array.isArray(payload) ? payload.filter((s): s is string => typeof s === "string") : [];
+    await im.reconcileSources(sources);
     return { ok: true };
   });
 }

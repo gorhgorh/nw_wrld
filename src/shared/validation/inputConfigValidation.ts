@@ -25,7 +25,7 @@ export function normalizeInputConfig(value: unknown): InputConfig | null {
 
   const rawType = asNonEmptyStringPreserve(value.type);
   const type =
-    rawType === "midi" || rawType === "osc" || rawType === "audio" || rawType === "file"
+    rawType === "midi" || rawType === "osc" || rawType === "audio" || rawType === "file" || rawType === "websocket"
       ? rawType
       : null;
   if (!type) return null;

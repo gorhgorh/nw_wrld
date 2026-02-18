@@ -34,6 +34,7 @@ import { useDashboardUpdateConfig } from "./core/hooks/useDashboardUpdateConfig"
 import { useDashboardAudioDevices } from "./core/hooks/useDashboardAudioDevices";
 import { useDashboardAudioCapture } from "./core/hooks/useDashboardAudioCapture";
 import { useDashboardFileAudio } from "./core/hooks/useDashboardFileAudio";
+import { useInputSourceReconciliation } from "./core/hooks/useInputSourceReconciliation";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const Dashboard = () => {
@@ -140,6 +141,7 @@ const Dashboard = () => {
     status: "disconnected",
     message: "",
   });
+  const [lastInputEvents, setLastInputEvents] = useState({});
   const [workspaceModuleFiles, setWorkspaceModuleFiles] = useState([]);
   const [workspaceModuleLoadFailures, setWorkspaceModuleLoadFailures] = useState([]);
   const [workspaceModuleSkipped, setWorkspaceModuleSkipped] = useState([]);
@@ -270,12 +272,14 @@ const Dashboard = () => {
     setFlashingConstructors,
     setInputStatus,
     setDebugLogs,
+    setLastInputEvents,
     sendToProjector,
     isDebugOverlayOpen,
     setIsProjectorReady,
   });
 
   useDashboardInputConfiguration({ userData, setUserData, invokeIPC, inputConfig });
+  useInputSourceReconciliation(userData, activeSetId);
 
   useDashboardPersistence({
     isInitialMountRef: isInitialMount,
@@ -462,6 +466,7 @@ const Dashboard = () => {
         isMuted={isSequencerMuted}
         onMuteChange={setIsSequencerMuted}
         isProjectorReady={isProjectorReady}
+        lastInputEvents={lastInputEvents}
       />
 
       <DashboardModalLayer
@@ -528,6 +533,8 @@ const Dashboard = () => {
         onCreateModule={handleCreateModule}
         debugLogs={debugLogs}
         perfStats={perfStats}
+        lastInputEvents={lastInputEvents}
+        inputStatus={inputStatus}
         selectedChannel={selectedChannel}
         setSelectedChannel={setSelectedChannel}
         onEditChannel={handleEditChannel}

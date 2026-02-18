@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -22,6 +23,13 @@ type TriggerMaps = ReturnType<typeof buildMidiConfig>;
 type RecordingStateEntry = { startTime: number; isRecording: boolean };
 type RecordingState = Record<string, RecordingStateEntry | undefined>;
 
+export type LastInputEvent = {
+  source: string;
+  summary: string;
+  type: string;
+  ts: number;
+};
+
 type UseInputEventsArgs = {
   userData: unknown;
   activeSetId: unknown;
@@ -37,6 +45,7 @@ type UseInputEventsArgs = {
   setFlashingConstructors: Dispatch<SetStateAction<Set<string>>>;
   setInputStatus: (data: unknown) => void;
   setDebugLogs: Dispatch<SetStateAction<string[]>>;
+  setLastInputEvents: Dispatch<SetStateAction<Record<string, LastInputEvent>>>;
   sendToProjector: (type: string, props: Record<string, unknown>) => void;
   isDebugOverlayOpen: boolean;
   setIsProjectorReady: (ready: boolean) => void;
@@ -57,10 +66,13 @@ export const useInputEvents = ({
   setFlashingConstructors,
   setInputStatus,
   setDebugLogs,
+  setLastInputEvents,
   sendToProjector,
   isDebugOverlayOpen,
   setIsProjectorReady,
 }: UseInputEventsArgs) => {
+  const triggerMapsBySourceRef = useRef<Record<string, TriggerMaps>>({});
+
   useEffect(() => {
     const tracks = getActiveSetTracks(userData, activeSetId);
     const globalMappings =
@@ -77,6 +89,13 @@ export const useInputEvents = ({
     const inputType =
       (inputObj && typeof inputObj.type === "string" ? inputObj.type : null) || "midi";
     triggerMapsRef.current = buildMidiConfig(tracks, globalMappings, inputType);
+    // Pre-build maps for other source types so cross-source events resolve correctly
+    const otherTypes = ["midi", "osc", "websocket", "audio", "file"].filter((t) => t !== inputType);
+    const bySource: Record<string, TriggerMaps> = { [inputType]: triggerMapsRef.current };
+    for (const t of otherTypes) {
+      bySource[t] = buildMidiConfig(tracks, globalMappings, t);
+    }
+    triggerMapsBySourceRef.current = bySource;
   }, [
     (userData as { sets?: unknown })?.sets,
     (userData as { config?: { input?: unknown } })?.config?.input,
@@ -160,7 +179,9 @@ export const useInputEvents = ({
             ? "AUDIO"
             : source === "file"
               ? "FILE"
-              : "Input";
+              : source === "websocket"
+                ? "WS"
+                : "Input";
     const eventTypeLabel = type === "track-selection" ? "Track Selection" : "Method Trigger";
 
     let log = `[${timeStr}] ${sourceLabel} ${eventTypeLabel}\n`;
@@ -191,16 +212,16 @@ export const useInputEvents = ({
         }\n`;
         log += `  Channel: ${String(data.channel)}\n`;
       }
-    } else if (source === "osc" || source === "audio" || source === "file") {
+    } else if (source === "osc" || source === "audio" || source === "file" || source === "websocket") {
       const address = typeof data.address === "string" ? (data.address as string) : null;
       const identifier = typeof data.identifier === "string" ? (data.identifier as string) : null;
       const channelName =
         typeof data.channelName === "string" ? (data.channelName as string) : null;
       const value = data.value;
-      if (address && source === "osc") {
+      if (address && (source === "osc" || source === "websocket")) {
         log += `  Address: ${address}\n`;
       }
-      if (identifier && source === "osc") {
+      if (identifier && (source === "osc" || source === "websocket")) {
         log += `  Identifier: ${identifier}\n`;
       }
       if (channelName) {
@@ -256,17 +277,37 @@ export const useInputEvents = ({
         inputCfgRaw && typeof inputCfgRaw === "object"
           ? (inputCfgRaw as Record<string, unknown>)
           : null;
-      const selectedInputType =
-        (inputCfg && typeof inputCfg.type === "string" ? inputCfg.type : null) || "midi";
       if (isSequencerMode) {
         return;
       }
       const source = typeof data.source === "string" ? data.source : null;
-      if (source && source !== selectedInputType) {
-        return;
+
+      // Track last input event per source for debug display
+      if (source) {
+        const summary = (() => {
+          if (source === "midi") {
+            const note = typeof data.note === "number" ? data.note : "?";
+            return type === "track-selection" ? `track note ${note}` : `note ${note}`;
+          }
+          if (source === "osc" || source === "websocket") {
+            const addr = typeof data.address === "string" ? data.address : "";
+            const ident = typeof data.identifier === "string" ? data.identifier : "";
+            return addr || ident || type;
+          }
+          if (source === "audio" || source === "file") {
+            const ch = typeof data.channelName === "string" ? data.channelName : "";
+            return ch || type;
+          }
+          return type;
+        })();
+        setLastInputEvents((prev) => ({
+          ...prev,
+          [source]: { source, summary, type, ts: Date.now() },
+        }));
       }
 
       const tracks = getActiveSetTracks(userDataRef.current || {}, activeSetIdRef.current);
+
       const noteMatchMode = normalizeNoteMatchMode(inputCfg?.noteMatchMode);
       let trackName: string | null = null;
       const moduleInfo: Record<string, unknown> | null = null;
@@ -279,12 +320,14 @@ export const useInputEvents = ({
 
           if (source === "midi") {
             const key = noteNumberToTriggerKey(data.note, noteMatchMode);
-            const mapped = key !== null ? triggerMapsRef.current.trackTriggersMap[key] : null;
+            const maps = triggerMapsBySourceRef.current[source] || triggerMapsRef.current;
+            const mapped = key !== null ? maps.trackTriggersMap[key] : null;
             resolvedTrackName = typeof mapped === "string" ? mapped : null;
-          } else if (source === "osc") {
+          } else if (source === "osc" || source === "websocket") {
             const identifier =
               typeof data.identifier === "string" ? (data.identifier as string) : null;
-            const mapped = identifier ? triggerMapsRef.current.trackTriggersMap[identifier] : null;
+            const maps = triggerMapsBySourceRef.current[source] || triggerMapsRef.current;
+            const mapped = identifier ? maps.trackTriggersMap[identifier] : null;
             resolvedTrackName = typeof mapped === "string" ? mapped : null;
           }
 
@@ -365,7 +408,6 @@ export const useInputEvents = ({
           }) as Record<string, unknown> | undefined;
 
           if (activeTrack && activeTrack.channelMappings) {
-            const channelsToFlash: string[] = [];
             const globalMappings = userDataRef.current
               ? ((userDataRef.current as Record<string, unknown>).config as
                   | Record<string, unknown>
@@ -379,86 +421,93 @@ export const useInputEvents = ({
             const currentInputType =
               (gmInput && typeof gmInput.type === "string" ? gmInput.type : null) || "midi";
 
-            if (source === "midi") {
-              const triggerKey = noteNumberToTriggerKey(data.note, noteMatchMode);
-              if (triggerKey === null) break;
-              Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
-                ([channelNumber, slotNumber]) => {
-                  const resolvedTrigger = resolveChannelTrigger(
-                    slotNumber,
-                    currentInputType,
-                    globalMappings
-                  );
-                  const resolvedKey = parseMidiTriggerValue(resolvedTrigger, noteMatchMode);
-                  if (resolvedKey === triggerKey) {
-                    channelsToFlash.push(channelNumber);
+            const modules = Array.isArray(activeTrack.modules) ? (activeTrack.modules as Record<string, unknown>[]) : [];
+            const modulesData = activeTrack.modulesData && typeof activeTrack.modulesData === "object"
+              ? (activeTrack.modulesData as Record<string, unknown>)
+              : {};
+
+            // Determine whether a trigger value matches the incoming event
+            const matchesTrigger = (triggerValue: unknown, sourceType: string): boolean => {
+              if (sourceType === "midi") {
+                const triggerKey = noteNumberToTriggerKey(data.note, noteMatchMode);
+                if (triggerKey === null) return false;
+                const resolvedKey = parseMidiTriggerValue(triggerValue, noteMatchMode);
+                return resolvedKey === triggerKey;
+              }
+              // osc / websocket / audio / file
+              const channelName = typeof data.channelName === "string" ? data.channelName : null;
+              if (!channelName) return false;
+              return String(triggerValue) === channelName;
+            };
+
+            // Per-module channel matching: for each channel, check each module
+            // considering its inputSource and inputMappings overrides
+            const channelsToFlash = new Set<string>();
+
+            Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
+              ([channelNumber, slotNumber]) => {
+                const hasAnyModuleSource = modules.some(
+                  (m) => m && typeof m.inputSource === "string" && m.inputSource
+                );
+
+                for (const m of modules) {
+                  if (!m || m.disabled === true) continue;
+                  const mId = typeof m.id === "string" ? m.id : null;
+                  if (!mId) continue;
+
+                  // Check this module has methods on this channel
+                  const modData = modulesData[mId] && typeof modulesData[mId] === "object"
+                    ? (modulesData[mId] as Record<string, unknown>)
+                    : null;
+                  const methods = modData?.methods && typeof modData.methods === "object"
+                    ? (modData.methods as Record<string, unknown>)
+                    : null;
+                  if (!methods || !methods[channelNumber]) continue;
+
+                  // Determine the effective source for this module
+                  const moduleSource = typeof m.inputSource === "string" && m.inputSource
+                    ? m.inputSource
+                    : currentInputType;
+
+                  // Source filtering: skip if event source doesn't match module's source
+                  if (hasAnyModuleSource && moduleSource !== source) continue;
+                  if (!hasAnyModuleSource && source !== currentInputType) continue;
+
+                  // Check per-module inputMappings override
+                  const rawMappings = m.inputMappings && typeof m.inputMappings === "object" && !Array.isArray(m.inputMappings)
+                    ? (m.inputMappings as Record<string, unknown>)
+                    : null;
+
+                  if (rawMappings && rawMappings[channelNumber] !== undefined) {
+                    // Module has a custom override for this channel — use it
+                    const overrideValue = rawMappings[channelNumber];
+                    if (matchesTrigger(overrideValue, moduleSource)) {
+                      channelsToFlash.add(channelNumber);
+                    }
+                  } else {
+                    // Use global channel trigger
+                    const resolvedTrigger = resolveChannelTrigger(slotNumber, moduleSource, globalMappings);
+                    if (matchesTrigger(resolvedTrigger, moduleSource)) {
+                      channelsToFlash.add(channelNumber);
+                    }
                   }
                 }
-              );
-            } else if (source === "osc") {
-              const channelName =
-                typeof data.channelName === "string" ? (data.channelName as string) : null;
-              if (channelName) {
-                Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
-                  ([channelNumber, slotNumber]) => {
-                    const resolvedTrigger = resolveChannelTrigger(
-                      slotNumber,
-                      currentInputType,
-                      globalMappings
-                    );
-                    if (resolvedTrigger === channelName) {
-                      channelsToFlash.push(channelNumber);
-                    }
-                  }
-                );
               }
-            } else if (source === "audio") {
-              const channelName =
-                typeof data.channelName === "string" ? (data.channelName as string) : null;
-              if (channelName) {
-                Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
-                  ([channelNumber, slotNumber]) => {
-                    const resolvedTrigger = resolveChannelTrigger(
-                      slotNumber,
-                      currentInputType,
-                      globalMappings
-                    );
-                    if (resolvedTrigger === channelName) {
-                      channelsToFlash.push(channelNumber);
-                    }
-                  }
-                );
-              }
-            } else if (source === "file") {
-              const channelName =
-                typeof data.channelName === "string" ? (data.channelName as string) : null;
-              if (channelName) {
-                Object.entries(activeTrack.channelMappings as Record<string, unknown>).forEach(
-                  ([channelNumber, slotNumber]) => {
-                    const resolvedTrigger = resolveChannelTrigger(
-                      slotNumber,
-                      currentInputType,
-                      globalMappings
-                    );
-                    if (resolvedTrigger === channelName) {
-                      channelsToFlash.push(channelNumber);
-                    }
-                  }
-                );
-              }
-            }
+            );
 
-            channelsToFlash.forEach((channel) => {
+            const filteredChannels = Array.from(channelsToFlash);
+
+            filteredChannels.forEach((channel) => {
               flashChannel(channel, 100);
             });
 
-            if (currentActiveTrackIdKey && channelsToFlash.length > 0) {
+            if (currentActiveTrackIdKey && filteredChannels.length > 0) {
               const recordingStateForTrack = recordingStateRef.current[currentActiveTrackIdKey];
               if (recordingStateForTrack?.isRecording) {
                 const currentTime = Date.now();
                 const relativeTime = (currentTime - recordingStateForTrack.startTime) / 1000;
 
-                channelsToFlash.forEach((channelNumber) => {
+                filteredChannels.forEach((channelNumber) => {
                   const channelName = `ch${channelNumber}`;
                   setRecordingData((prev) => {
                     const recording = getRecordingForTrack(prev, currentActiveTrackIdKey);

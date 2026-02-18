@@ -14,6 +14,14 @@ type InputStatus = {
   status: string;
   message?: string;
   config?: { input?: InputConfig } | null;
+  activeSources?: string[];
+};
+
+type LastInputEvent = {
+  source: string;
+  summary: string;
+  type: string;
+  ts: number;
 };
 
 type DashboardConfig = { sequencerMode?: boolean } & Record<string, unknown>;
@@ -30,6 +38,23 @@ type DashboardFooterProps = {
   isMuted: boolean;
   onMuteChange: (next: boolean) => void;
   isProjectorReady: boolean;
+  lastInputEvents?: Record<string, LastInputEvent>;
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  midi: "MIDI",
+  osc: "OSC",
+  websocket: "WS",
+  audio: "AUDIO",
+  file: "FILE",
+};
+
+const formatRelativeTime = (ts: number): string => {
+  const delta = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (delta < 1) return "now";
+  if (delta < 60) return `${delta}s ago`;
+  const mins = Math.floor(delta / 60);
+  return `${mins}m ago`;
 };
 
 export const DashboardFooter = ({
@@ -44,6 +69,7 @@ export const DashboardFooter = ({
   isMuted,
   onMuteChange,
   isProjectorReady,
+  lastInputEvents,
 }: DashboardFooterProps) => {
   const [_recordingData] = useAtom(recordingDataAtom);
   const isFileMode = !config?.sequencerMode && inputConfig?.type === "file";
@@ -75,54 +101,85 @@ export const DashboardFooter = ({
   const getStatusIcon = () => {
     switch (inputStatus.status) {
       case "connected":
-        return "●";
+        return "\u25CF";
       case "connecting":
-        return "◐";
+        return "\u25D0";
       case "error":
-        return "✕";
+        return "\u2715";
       default:
-        return "○";
+        return "\u25CB";
     }
   };
 
-  const getStatusText = () => {
-    if (inputStatus?.message && inputStatus.message !== "") {
-      return inputStatus.message;
-    }
+  // Build active sources display from status payload
+  const activeSources = inputStatus.activeSources || [];
 
-    const statusInput = inputStatus?.config?.input || null;
-    if (statusInput && statusInput.type) {
-      if (statusInput.type === "osc") {
-        return `Listening on Port ${statusInput.port || 8000}`;
-      } else if (statusInput.type === "midi") {
-        return `MIDI: ${statusInput.deviceName || "Not configured"}`;
-      }
-    }
+  // Find the most recent input event
+  const lastEvent = (() => {
+    if (!lastInputEvents) return null;
+    const entries = Object.values(lastInputEvents);
+    if (entries.length === 0) return null;
+    return entries.reduce((a, b) => (a.ts > b.ts ? a : b));
+  })();
 
-    if (inputConfig?.type === "osc") {
-      return `Listening on Port ${inputConfig.port || 8000}`;
-    } else if (inputConfig?.type === "midi") {
-      return `MIDI: ${inputConfig.deviceName || "Not configured"}`;
+  const renderSourceBadges = () => {
+    if (activeSources.length === 0 && inputConfig?.type) {
+      // Fallback: show configured type
+      return (
+        <span className="text-neutral-500">
+          {SOURCE_LABELS[inputConfig.type] || inputConfig.type}
+        </span>
+      );
     }
-
-    return "No input";
+    return activeSources.map((s) => (
+      <span
+        key={s}
+        className="inline-flex items-center gap-1 text-blue-500"
+      >
+        <span className="text-[8px]">{"\u25CF"}</span>
+        {SOURCE_LABELS[s] || s}
+      </span>
+    ));
   };
+
+  const renderLastEvent = () => {
+    if (!lastEvent) return null;
+    const label = SOURCE_LABELS[lastEvent.source] || lastEvent.source;
+    return (
+      <span className="text-neutral-500">
+        <span className="text-neutral-400">{label}</span>{" "}
+        {lastEvent.summary}{" "}
+        <span className="text-neutral-600">{formatRelativeTime(lastEvent.ts)}</span>
+      </span>
+    );
+  };
+
+  const inputStatusRow = (
+    <div className="w-full flex justify-between items-center gap-4">
+      <button
+        onClick={onSettingsClick}
+        className={`text-[10px] font-mono flex items-center gap-3 cursor-pointer hover:opacity-70 transition-opacity ${getStatusColor()}`}
+        title={`${inputStatus.status}: ${inputStatus.message || ""}`}
+      >
+        <span>{getStatusIcon()}</span>
+        <span className="flex items-center gap-2">
+          {renderSourceBadges()}
+        </span>
+      </button>
+      {lastEvent && (
+        <div className="text-[10px] font-mono">
+          {renderLastEvent()}
+        </div>
+      )}
+    </div>
+  );
 
   if (!track) {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#101010] border-t border-neutral-800 px-6 py-4">
         <div className="w-full flex justify-start gap-4 items-center">
           <div className="text-neutral-300/30 text-[11px]">No track selected</div>
-          {!config?.sequencerMode && (
-            <button
-              onClick={onSettingsClick}
-              className={`text-[10px] font-mono flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity ${getStatusColor()}`}
-              title={`${inputStatus.status}: ${getStatusText()}`}
-            >
-              <span>{getStatusIcon()}</span>
-              <span>{getStatusText()}</span>
-            </button>
-          )}
+          {!config?.sequencerMode && inputStatusRow}
         </div>
       </div>
     );
@@ -189,14 +246,7 @@ export const DashboardFooter = ({
               </label>
             </>
           ) : (
-            <button
-              onClick={onSettingsClick}
-              className={`text-[10px] font-mono flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity ${getStatusColor()}`}
-              title={`${inputStatus.status}: ${getStatusText()}`}
-            >
-              <span>{getStatusIcon()}</span>
-              <span>{getStatusText()}</span>
-            </button>
+            inputStatusRow
           )}
         </div>
       </div>

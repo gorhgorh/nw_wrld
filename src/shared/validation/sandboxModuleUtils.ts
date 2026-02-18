@@ -5,7 +5,10 @@ const WORKSPACE_MODULE_ALLOWED_IMPORTS = new Set([
   "readText",
   "loadJson",
   "listAssets",
+  "tween",
+  "resolveEasing",
   "THREE",
+  "TWEEN",
   "p5",
   "d3",
   "Noise",
@@ -51,7 +54,9 @@ export const ensureTrailingSlash = (url: unknown): string => {
 
 export const buildWorkspaceImportPreamble = (
   moduleId: unknown,
-  importsList: unknown
+  importsList: unknown,
+  additionalAllowed?: Set<string>,
+  skipSafetyCheckFor?: Set<string>
 ): string => {
   const safeModuleId = String(moduleId || "");
   const requested = Array.isArray(importsList) ? importsList : [];
@@ -60,8 +65,11 @@ export const buildWorkspaceImportPreamble = (
       `[Sandbox] Workspace module "${safeModuleId}" missing required @nwWrld imports.`
     );
   }
+  const allowed = additionalAllowed
+    ? new Set([...WORKSPACE_MODULE_ALLOWED_IMPORTS, ...additionalAllowed])
+    : WORKSPACE_MODULE_ALLOWED_IMPORTS;
   for (const token of requested) {
-    if (typeof token !== "string" || !WORKSPACE_MODULE_ALLOWED_IMPORTS.has(token)) {
+    if (typeof token !== "string" || !allowed.has(token)) {
       throw new Error(
         `[Sandbox] Workspace module "${safeModuleId}" requested unknown import "${String(
           token
@@ -77,7 +85,9 @@ export const buildWorkspaceImportPreamble = (
       t === "assetUrl" ||
       t === "readText" ||
       t === "loadJson" ||
-      t === "listAssets"
+      t === "listAssets" ||
+      t === "tween" ||
+      t === "resolveEasing"
   );
   const globalImports = requested.filter((t) => !sdkImports.includes(t));
 
@@ -89,6 +99,7 @@ export const buildWorkspaceImportPreamble = (
     lines.push(`const ${g} = globalThis.${g};`);
   }
   for (const token of requested) {
+    if (skipSafetyCheckFor?.has(token)) continue;
     lines.push(`if (!${token}) { throw new Error("Missing required import: ${token}"); }`);
   }
   return `${lines.join("\n")}\n`;

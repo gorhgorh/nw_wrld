@@ -1,6 +1,6 @@
 import logger from "../../helpers/logger";
 import { TrackSandboxHost } from "../sandbox/TrackSandboxHost";
-import { getMessaging } from "../bridge";
+import { getBridge, getMessaging } from "../bridge";
 
 type PreviewControllerContext = {
   previewToken: number;
@@ -123,10 +123,24 @@ export async function previewModule(
       return;
     }
 
+    // Load user-defined imports from workspace
+    let userImports: unknown[] = [];
+    try {
+      const bridge = getBridge();
+      const workspace = bridge?.workspace;
+      if (workspace && typeof workspace.readUserImports === "function") {
+        const importResult = await workspace.readUserImports() as { ok?: boolean; imports?: unknown[] } | null;
+        if (importResult && importResult.ok && Array.isArray(importResult.imports)) {
+          userImports = importResult.imports;
+        }
+      }
+    } catch {}
+
     const res = await this.trackSandboxHost.initTrack({
       track,
       moduleSources,
       assetsBaseUrl,
+      userImports,
     });
     if (!res || typeof res !== "object" || (res as { ok?: unknown }).ok !== true) {
       throw new Error(

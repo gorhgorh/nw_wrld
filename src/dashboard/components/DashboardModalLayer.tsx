@@ -90,6 +90,8 @@ type DashboardModalLayerProps = {
 
   debugLogs: string[];
   perfStats: { fps: number; frameMsAvg: number; longFramePct: number; at: number } | null;
+  lastInputEvents: Record<string, { source: string; summary: string; type: string; ts: number }>;
+  inputStatus: { status: string; message?: string; activeSources?: string[] };
 
   selectedChannel: unknown;
   setSelectedChannel: (next: unknown) => void;
@@ -176,6 +178,8 @@ export const DashboardModalLayer = ({
   onCreateModule,
   debugLogs,
   perfStats,
+  lastInputEvents,
+  inputStatus,
   selectedChannel,
   setSelectedChannel,
   onEditChannel,
@@ -320,6 +324,8 @@ export const DashboardModalLayer = ({
         onClose={() => setIsDebugOverlayOpen(false)}
         debugLogs={debugLogs}
         perfStats={perfStats}
+        lastInputEvents={lastInputEvents}
+        inputStatus={inputStatus}
       />
       <MethodConfiguratorModal
         isOpen={!!selectedChannel}
